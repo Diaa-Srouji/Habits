@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Habit tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Habits</h1>
+  <p class="sub" id="date"></p>
+  <p class="sub" id="who" hidden><span id="mail"></span> · <button class="rm" id="out">Sign out</button></p>
+  <section id="auth" hidden><h2>Sign in to sync your habits</h2>
+    <form id="login"><input id="email" type="email" placeholder="Email" autocomplete="email" required aria-label="Email"><input id="pass" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" minlength="6" required aria-label="Password"><button class="btn">Sign in</button><button class="btn alt" type="button" id="signup">Create account</button></form>
+    <p class="empty" id="msg" role="alert"></p></section>
+  <div id="app" hidden>
+  <form id="add"><input id="name" placeholder="New habit, e.g. Read 20 pages" maxlength="60" aria-label="New habit name" required><button class="btn">Add habit</button></form>
+  <section id="sumsec" aria-label="Progress"><div class="sum" id="sum"></div></section>
+  <section id="detail" hidden></section>
+  <section id="heatsec" aria-label="Heatmap"><h2>Last 20 weeks</h2><div class="chips" id="chips"></div><div class="scroll"><div class="heat" id="heat"></div></div><div class="legend" id="legend"></div></section>
+  <section id="listsec" aria-label="Habits"><h2>Your habits</h2><div id="list"></div></section>
+</div>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
