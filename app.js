@@ -38,9 +38,12 @@ function norm(h){if(!h.goal){h.goal=30;h.unit='min';for(const k in h.done)h.done
   h.unit=h.unit||'min';h.notes=h.notes||{};if(!h.created)h.created=Object.keys(h.done).sort()[0]||K(T())}
 const span=(h,from)=>{const c=dateOf(h.created),f=c>from?c:from;return Math.max(1,Math.round((T()-f)/864e5)+1)};
 const sumAmt=(h,from,to)=>{let n=0;for(let d=from;d<=to;d=add(d,1))n+=h.done[K(d)]||0;return Math.round(n*10)/10};
-function logHTML(h,k){const v=h.done[k]||0,lv=levelOf(h,v),u=esc(h.unit);
+function logHTML(h,k,sv=true){const dk=h.id+'|'+k,dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==(h.done[k]||0),v=dirty?S.draft[dk]:(h.done[k]||0),lv=levelOf(h,v),u=esc(h.unit);
   return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v||''}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
-  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${LN[lv]}</span></span>`}
+  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
+function markUnsaved(row){S.saved=false;const ss=$('savestate');if(ss)ss.textContent='Unsaved changes';const u=row&&row.querySelector('.uns');if(u)u.textContent='Unsaved'}
+function saveDay(h,k){const dk=h.id+'|'+k;if(S.draft&&dk in S.draft){setAmt(h,k,S.draft[dk]);delete S.draft[dk]}
+  const n=$('note');if(n){const v=n.value;if(v.trim())h.notes[k]=v;else delete h.notes[k]}S.saved=true}
 
 function render(){
   S.habits.forEach(norm);const P=periods(),H=S.habits,n=H.length;
@@ -87,19 +90,22 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   <label for="desc">Description (optional)</label>
   <textarea id="desc" rows="2" placeholder="What are you aiming for, and why?">${esc(h.desc||'')}</textarea>
   <label for="dayPick">Day</label>
-  <div class="dayrow"><input type="date" id="dayPick" value="${k}" max="${K(T())}">${logHTML(h,k)}</div>
+  <div class="dayrow"><input type="date" id="dayPick" value="${k}" max="${K(T())}">${logHTML(h,k,false)}</div>
   <p class="hint">Lowest = under half your goal · Low = half · Normal = your goal · Better = 1.5× · Best = 2×</p>
   <textarea id="note" rows="4" aria-label="Note for ${fmt(k)}" placeholder="Note for ${fmt(k)} (optional)">${esc((h.notes||{})[k]||'')}</textarea>
+  <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>
   <h2>All notes</h2><div id="notelist"></div>`;
   renderNotes(h)}
 const _r=render;render=()=>{_r();const O=S.habits.find(h=>h.id===S.open);if(O)renderDetail(O)};
 const flip=(h,k)=>{h.done[k]?delete h.done[k]:setAmt(h,k,levelAmt(h,3))};
 document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
   if(t.dataset.sel){S.sel=t.dataset.sel}
-  else if(t.dataset.lvl){const [id,k,i]=t.dataset.lvl.split('|');const h=S.habits.find(x=>x.id===id);if(h)setAmt(h,k,levelAmt(h,+i))}
-  else if(t.dataset.day){if(S.open)S.day=t.dataset.day;else flip(S.habits.find(h=>h.id===S.sel),t.dataset.day)}
-  else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());window.scrollTo(0,0)}
-  else if(t.dataset.back){S.open=null;S.sel='all'}
+  else if(t.dataset.lvl){const [id,k,i]=t.dataset.lvl.split('|');const h=S.habits.find(x=>x.id===id);if(h){(S.draft=S.draft||{})[id+'|'+k]=levelAmt(h,+i);S.saved=false}}
+  else if(t.dataset.save){const [id,k]=t.dataset.save.split('|');const h=S.habits.find(x=>x.id===id);if(h){if(S.draft&&t.dataset.save in S.draft){setAmt(h,k,S.draft[t.dataset.save]);delete S.draft[t.dataset.save]}}}
+  else if(t.dataset.saveday){const h=S.habits.find(x=>x.id===S.open);if(h)saveDay(h,S.day)}
+  else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.saved=false}else{S.open=S.sel;S.day=t.dataset.day;S.draft={};S.saved=false;window.scrollTo(0,0)}}
+  else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());S.draft={};S.saved=false;window.scrollTo(0,0)}
+  else if(t.dataset.back){S.open=null;S.sel='all';S.draft={}}
   else if(t.dataset.rm){S.habits=S.habits.filter(h=>h.id!==t.dataset.rm);if(S.sel===t.dataset.rm)S.sel='all'}
   else return;
   save();render()});
@@ -109,15 +115,19 @@ document.addEventListener('input',e=>{const h=S.habits.find(x=>x.id===S.open);if
   if(e.target.id==='goalAmt'){const g=Number(e.target.value);if(g>0)h.goal=g;else return}
   else if(e.target.id==='unitIn'){h.unit=e.target.value.trim()||'min'}
   else if(e.target.id==='desc'){h.desc=e.target.value}
-  else if(e.target.id==='note'){h.notes=h.notes||{};const v=e.target.value;if(v.trim())h.notes[S.day]=v;else delete h.notes[S.day]}
+  else if(e.target.id==='note'){markUnsaved();return}
   else return;save()});
 document.addEventListener('change',e=>{const h=S.habits.find(x=>x.id===S.open);if(!h)return;const id=e.target.id;
-  if(id==='dayPick'&&e.target.value){S.day=e.target.value;render()}
+  if(id==='dayPick'&&e.target.value){S.day=e.target.value;S.draft={};S.saved=false;render()}
   else if(id==='dayDone'){flip(h,S.day);save();render()}
   else if(id==='goalAmt'||id==='unitIn')render();
   else if(id==='note')renderNotes(h)});
-document.addEventListener('change',e=>{const a=e.target.dataset&&e.target.dataset.amt;if(!a)return;
-  const [id,k]=a.split('|'),h=S.habits.find(x=>x.id===id);if(!h)return;setAmt(h,k,e.target.value);save();render()});
+document.addEventListener('input',e=>{const a=e.target.dataset&&e.target.dataset.amt;if(!a)return;
+  const h=S.habits.find(x=>x.id===a.split('|')[0]);if(!h)return;
+  const v=Math.max(0,Number(e.target.value)||0);(S.draft=S.draft||{})[a]=v;
+  const row=e.target.closest('.log'),lv=levelOf(h,v);
+  row.querySelectorAll('.lv').forEach((b,i)=>b.setAttribute('aria-pressed',i===lv));
+  row.querySelector('.lvname').textContent=LN[lv];markUnsaved(row)});
 const root=document.documentElement;
 const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
 const paintTheme=()=>{$('theme').textContent=isDark()?'☀ Light mode':'☾ Dark mode'};
