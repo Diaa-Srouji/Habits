@@ -38,17 +38,35 @@ function norm(h){if(!h.goal){h.goal=30;h.unit='min';for(const k in h.done)h.done
   h.unit=h.unit||'min';h.notes=h.notes||{};if(!h.created)h.created=Object.keys(h.done).sort()[0]||K(T())}
 const span=(h,from)=>{const c=dateOf(h.created),f=c>from?c:from;return Math.max(1,Math.round((T()-f)/864e5)+1)};
 const sumAmt=(h,from,to)=>{let n=0;for(let d=from;d<=to;d=add(d,1))n+=h.done[K(d)]||0;return Math.round(n*10)/10};
+// Shade inside a level: 15 min and 20 min share a level color but 20 min is slightly stronger
+const levelFrac=(h,v)=>{const r=v/h.goal;return Math.min(1,r>=2?r-2:r>=1.5?(r-1.5)*2:r>=1?(r-1)*2:r>=.5?(r-.5)*2:r*2)};
+const shade=(lv,t)=>lv?` style="background:color-mix(in srgb,var(--l${lv}) ${Math.round(65+35*t)}%,var(--card))"`:'';
+// Standard grid of W weeks. It starts in the week of the first day (earlier days stay blank),
+// future days are empty squares, and it slides forward once the habit is older than W weeks.
+function heatCells(one,H,P){
+  const first=dateOf(one?one.created:(H.map(h=>h.created).sort()[0]||K(P.t)));
+  const cur=mondayOf(P.t),wk0=mondayOf(first);
+  const start=Math.round((cur-wk0)/6048e5)>=W?add(cur,-(W-1)*7):wk0;let cells='';
+  for(let i=0;i<W*7;i++){const d=add(start,i),k=K(d);
+    if(d<first){cells+='<div class="pre"></div>';continue}
+    if(d>P.t){cells+='<div class="fut" title="'+k+'"></div>';continue}
+    const ds=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});let lv,t=0,label;
+    if(one){const v=one.done[k]||0;lv=levelOf(one,v);t=v?levelFrac(one,v):0;label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':'not done')}
+    else{const act=H.filter(h=>h.created<=k),sum=act.reduce((a,h)=>a+levelOf(h,h.done[k]||0),0),avg=act.length?sum/act.length:0;
+      lv=sum?Math.max(1,Math.min(5,Math.round(avg))):0;t=lv?Math.min(1,Math.max(0,avg-lv+.5)):0;label=ds+': '+act.filter(h=>h.done[k]).length+' of '+act.length+' habits done'}
+    cells+=`<button class="l${lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} title="${label}" aria-label="${label}"></button>`}
+  return cells}
 function logHTML(h,k,sv=true){const dk=h.id+'|'+k,dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==(h.done[k]||0),v=dirty?S.draft[dk]:(h.done[k]||0),lv=levelOf(h,v),u=esc(h.unit);
   return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v||''}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
   LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
 function markUnsaved(row){S.saved=false;const ss=$('savestate');if(ss)ss.textContent='Unsaved changes';const u=row&&row.querySelector('.uns');if(u)u.textContent='Unsaved'}
 function saveDay(h,k){const dk=h.id+'|'+k;if(S.draft&&dk in S.draft){setAmt(h,k,S.draft[dk]);delete S.draft[dk]}
-  const n=$('note');if(n){const v=n.value;if(v.trim())h.notes[k]=v;else delete h.notes[k]}S.saved=true}
+  const n=$('note');if(n){const v=n.value;if(v.trim())h.notes[k]=v;else delete h.notes[k]}S.noteDraft=null;S.saved=true}
 
 function render(){
   S.habits.forEach(norm);const P=periods(),H=S.habits,n=H.length;
   const O=H.find(h=>h.id===S.open);if(!O)S.open=null;else S.sel=O.id;
-  ['add','sumsec','listsec'].forEach(i=>$(i).hidden=!!O);$('detail').hidden=!O;$('chips').hidden=!!O;
+  ['add','sumsec','listsec','heatsec'].forEach(i=>$(i).hidden=!!O);$('detail').hidden=!O;$('chips').hidden=!!O;
   $('date').textContent=P.t.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const td=H.filter(h=>h.done[K(P.t)]).length;
   const wkDone=H.reduce((a,h)=>a+count(h,P.wk,P.t),0),moDone=H.reduce((a,h)=>a+count(h,P.mo,P.t),0);
@@ -58,18 +76,7 @@ function render(){
 
   $('chips').innerHTML=`<button class="chip" data-sel="all" aria-pressed="${S.sel==='all'}">All habits</button>`+H.map(h=>`<button class="chip" data-sel="${h.id}" aria-pressed="${S.sel===h.id}">${esc(h.name)}</button>`).join('');
   const one=H.find(h=>h.id===S.sel);if(!one)S.sel='all';
-  // The heatmap starts on the habit's first day (or the earliest habit when showing all)
-  const first=dateOf(one?one.created:(H.map(h=>h.created).sort()[0]||K(P.t)));
-  const weeks=Math.min(W,Math.round((mondayOf(P.t)-mondayOf(first))/6048e5)+1);
-  const start=add(mondayOf(P.t),-(weeks-1)*7);let cells='';
-  for(let i=0;i<weeks*7;i++){const d=add(start,i),k=K(d);
-    if(d>P.t||d<first){cells+='<div class="fut"></div>';continue}
-    const ds=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});let lv,label;
-    if(one){const v=one.done[k]||0;lv=levelOf(one,v);label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':'not done')}
-    else{const act=H.filter(h=>h.created<=k),sum=act.reduce((a,h)=>a+levelOf(h,h.done[k]||0),0);
-      lv=sum?Math.max(1,Math.min(5,Math.round(sum/act.length))):0;label=ds+': '+act.filter(h=>h.done[k]).length+' of '+act.length+' habits done'}
-    cells+=`<button class="l${lv}${one?' edit':''}${k===K(P.t)?' now':''}${O&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}" ${one?`data-day="${k}"`:'tabindex="-1"'} title="${label}" aria-label="${label}"></button>`}
-  $('heat').innerHTML=cells;
+  $('heat').innerHTML=heatCells(one,H,P);
   $('legend').innerHTML='Less '+[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')+' More'+(O?' · Click a day to open its note':one?'':' · Select a habit to fill in past days');
 
   $('list').innerHTML=n?H.map(h=>{const w=count(h,P.wk,P.t),m=count(h,P.mo,P.t),sw=span(h,P.wk);
@@ -85,6 +92,8 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   $('detail').innerHTML=`<button class="rm" data-back="1">← All habits</button>
   <h2 class="dname">${esc(h.name)}</h2>
   <div class="meta"><span>Streak <b>${streak(h)}</b> days</span><span>Best <b>${best(h)}</b></span><span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
+  <h2 style="margin-top:16px">Heatmap</h2><div class="scroll"><div class="heat" id="heatH">${heatCells(h,S.habits,periods())}</div></div>
+  <div class="legend">Less ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} More · Click a day to edit it</div>
   <label for="goalAmt" style="margin-top:14px">Daily goal</label>
   <div class="dayrow"><input type="number" id="goalAmt" min="1" step="any" value="${h.goal}" style="flex:0 0 110px"><input id="unitIn" value="${esc(h.unit)}" maxlength="12" style="flex:0 0 90px" aria-label="Unit"></div>
   <label for="desc">Description (optional)</label>
@@ -92,7 +101,7 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   <label for="dayPick">Day</label>
   <div class="dayrow"><input type="date" id="dayPick" value="${k}" max="${K(T())}">${logHTML(h,k,false)}</div>
   <p class="hint">Lowest = under half your goal · Low = half · Normal = your goal · Better = 1.5× · Best = 2×</p>
-  <textarea id="note" rows="4" aria-label="Note for ${fmt(k)}" placeholder="Note for ${fmt(k)} (optional)">${esc((h.notes||{})[k]||'')}</textarea>
+  <textarea id="note" rows="4" aria-label="Note for ${fmt(k)}" placeholder="Note for ${fmt(k)} (optional)">${esc(S.noteDraft&&S.noteDraft.k===k?S.noteDraft.v:(h.notes||{})[k]||'')}</textarea>
   <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>
   <h2>All notes</h2><div id="notelist"></div>`;
   renderNotes(h)}
@@ -103,9 +112,9 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
   else if(t.dataset.lvl){const [id,k,i]=t.dataset.lvl.split('|');const h=S.habits.find(x=>x.id===id);if(h){(S.draft=S.draft||{})[id+'|'+k]=levelAmt(h,+i);S.saved=false}}
   else if(t.dataset.save){const [id,k]=t.dataset.save.split('|');const h=S.habits.find(x=>x.id===id);if(h){if(S.draft&&t.dataset.save in S.draft){setAmt(h,k,S.draft[t.dataset.save]);delete S.draft[t.dataset.save]}}}
   else if(t.dataset.saveday){const h=S.habits.find(x=>x.id===S.open);if(h)saveDay(h,S.day)}
-  else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.saved=false}else{S.open=S.sel;S.day=t.dataset.day;S.draft={};S.saved=false;window.scrollTo(0,0)}}
-  else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());S.draft={};S.saved=false;window.scrollTo(0,0)}
-  else if(t.dataset.back){S.open=null;S.sel='all';S.draft={}}
+  else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false}else{S.open=S.sel;S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false;window.scrollTo(0,0)}}
+  else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());S.draft={};S.noteDraft=null;S.saved=false;window.scrollTo(0,0)}
+  else if(t.dataset.back){S.open=null;S.sel='all';S.draft={};S.noteDraft=null}
   else if(t.dataset.rm){S.habits=S.habits.filter(h=>h.id!==t.dataset.rm);if(S.sel===t.dataset.rm)S.sel='all'}
   else return;
   save();render()});
@@ -115,10 +124,10 @@ document.addEventListener('input',e=>{const h=S.habits.find(x=>x.id===S.open);if
   if(e.target.id==='goalAmt'){const g=Number(e.target.value);if(g>0)h.goal=g;else return}
   else if(e.target.id==='unitIn'){h.unit=e.target.value.trim()||'min'}
   else if(e.target.id==='desc'){h.desc=e.target.value}
-  else if(e.target.id==='note'){markUnsaved();return}
+  else if(e.target.id==='note'){S.noteDraft={k:S.day,v:e.target.value};markUnsaved();return}
   else return;save()});
 document.addEventListener('change',e=>{const h=S.habits.find(x=>x.id===S.open);if(!h)return;const id=e.target.id;
-  if(id==='dayPick'&&e.target.value){S.day=e.target.value;S.draft={};S.saved=false;render()}
+  if(id==='dayPick'&&e.target.value){S.day=e.target.value;S.draft={};S.noteDraft=null;S.saved=false;render()}
   else if(id==='dayDone'){flip(h,S.day);save();render()}
   else if(id==='goalAmt'||id==='unitIn')render();
   else if(id==='note')renderNotes(h)});
