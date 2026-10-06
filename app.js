@@ -49,12 +49,13 @@ function heatCells(one,H,P){
   const start=Math.round((cur-wk0)/6048e5)>=W?add(cur,-(W-1)*7):wk0;let cells='';
   for(let i=0;i<W*7;i++){const d=add(start,i),k=K(d);
     if(d<first){cells+='<div class="pre"></div>';continue}
-    if(d>P.t){cells+='<div class="fut" title="'+k+'"></div>';continue}
+    if(d>P.t){cells+='<div class="fut" data-pk="'+k+'" data-ph="'+(one?one.id:'')+'"></div>';continue}
     const ds=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});let lv,t=0,label;
-    if(one){const v=one.done[k]||0;lv=levelOf(one,v);t=v?levelFrac(one,v):0;label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':'not done')}
+    if(one){const v=one.done[k]||0;lv=levelOf(one,v);t=v?levelFrac(one,v):0;label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':(k===K(P.t)?'not logged yet':'0 '+one.unit))}
     else{const act=H.filter(h=>h.created<=k),sum=act.reduce((a,h)=>a+levelOf(h,h.done[k]||0),0),avg=act.length?sum/act.length:0;
       lv=sum?Math.max(1,Math.min(5,Math.round(avg))):0;t=lv?Math.min(1,Math.max(0,avg-lv+.5)):0;label=ds+': '+act.filter(h=>h.done[k]).length+' of '+act.length+' habits done'}
-    cells+=`<button class="l${lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} title="${label}" aria-label="${label}"></button>`}
+    const pend=k===K(P.t)&&(one?!one.done[k]:!H.some(h=>h.created<=k&&h.done[k]));
+    cells+=`<button class="${pend?'pend':'l'+lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${pend?'':shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} data-pk="${k}" data-ph="${one?one.id:''}" aria-label="${label}"></button>`}
   return cells}
 function logHTML(h,k,sv=true){const dk=h.id+'|'+k,dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==(h.done[k]||0),v=dirty?S.draft[dk]:(h.done[k]||0),lv=levelOf(h,v),u=esc(h.unit);
   return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v||''}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
@@ -77,7 +78,7 @@ function render(){
   $('chips').innerHTML=`<button class="chip" data-sel="all" aria-pressed="${S.sel==='all'}">All habits</button>`+H.map(h=>`<button class="chip" data-sel="${h.id}" aria-pressed="${S.sel===h.id}">${esc(h.name)}</button>`).join('');
   const one=H.find(h=>h.id===S.sel);if(!one)S.sel='all';
   $('heat').innerHTML=heatCells(one,H,P);
-  $('legend').innerHTML='Less '+[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')+' More'+(O?' · Click a day to open its note':one?'':' · Select a habit to fill in past days');
+  $('legend').innerHTML='None '+[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')+' Best · Hover or click a day for details';
 
   $('list').innerHTML=n?H.map(h=>{const w=count(h,P.wk,P.t),m=count(h,P.mo,P.t),sw=span(h,P.wk);
     return `<div class="habit">
@@ -93,7 +94,7 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   <h2 class="dname">${esc(h.name)}</h2>
   <div class="meta"><span>Streak <b>${streak(h)}</b> days</span><span>Best <b>${best(h)}</b></span><span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
   <h2 style="margin-top:16px">Heatmap</h2><div class="scroll"><div class="heat" id="heatH">${heatCells(h,S.habits,periods())}</div></div>
-  <div class="legend">Less ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} More · Click a day to edit it</div>
+  <div class="legend">None ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} Best · Hover or click a day for details</div>
   <label for="goalAmt" style="margin-top:14px">Daily goal</label>
   <div class="dayrow"><input type="number" id="goalAmt" min="1" step="any" value="${h.goal}" style="flex:0 0 110px"><input id="unitIn" value="${esc(h.unit)}" maxlength="12" style="flex:0 0 90px" aria-label="Unit"></div>
   <label for="desc">Description (optional)</label>
@@ -105,16 +106,17 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>
   <h2>All notes</h2><div id="notelist"></div>`;
   renderNotes(h)}
-const _r=render;render=()=>{_r();const O=S.habits.find(h=>h.id===S.open);if(O)renderDetail(O)};
+const _r=render;render=()=>{hidePop();_r();const O=S.habits.find(h=>h.id===S.open);if(O)renderDetail(O)};
 const flip=(h,k)=>{h.done[k]?delete h.done[k]:setAmt(h,k,levelAmt(h,3))};
 document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
   if(t.dataset.sel){S.sel=t.dataset.sel}
   else if(t.dataset.lvl){const [id,k,i]=t.dataset.lvl.split('|');const h=S.habits.find(x=>x.id===id);if(h){(S.draft=S.draft||{})[id+'|'+k]=levelAmt(h,+i);S.saved=false}}
   else if(t.dataset.save){const [id,k]=t.dataset.save.split('|');const h=S.habits.find(x=>x.id===id);if(h){if(S.draft&&t.dataset.save in S.draft){setAmt(h,k,S.draft[t.dataset.save]);delete S.draft[t.dataset.save]}}}
   else if(t.dataset.saveday){const h=S.habits.find(x=>x.id===S.open);if(h)saveDay(h,S.day)}
-  else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false}else{S.open=S.sel;S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false;window.scrollTo(0,0)}}
+  else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false}else{return}}
   else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());S.draft={};S.noteDraft=null;S.saved=false;window.scrollTo(0,0)}
   else if(t.dataset.back){S.open=null;S.sel='all';S.draft={};S.noteDraft=null}
+  else if(t.dataset.editday){const [id,k]=t.dataset.editday.split('|');S.open=id;S.sel=id;S.day=k;S.draft={};S.noteDraft=null;S.saved=false;hidePop();window.scrollTo(0,0)}
   else if(t.dataset.rm){S.habits=S.habits.filter(h=>h.id!==t.dataset.rm);if(S.sel===t.dataset.rm)S.sel='all'}
   else return;
   save();render()});
@@ -142,6 +144,33 @@ const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':matchMedia('(pre
 const paintTheme=()=>{$('theme').textContent=isDark()?'☀ Light mode':'☾ Dark mode'};
 $('theme').addEventListener('click',()=>{const t=isDark()?'light':'dark';root.dataset.theme=t;try{localStorage.setItem('theme',t)}catch(e){}paintTheme()});
 paintTheme();
+const pop={el:null,cell:null,pinned:false,key:''};
+function popHTML(k,hid){
+  const P=periods(),H=S.habits,d=dateOf(k),today=k===K(P.t),one=hid&&H.find(x=>x.id===hid);
+  let out=`<div class="ph">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short',year:'numeric'})}</div>`;
+  if(d>P.t)return out+'<div class="pl">Upcoming</div>';
+  const line=h=>{const v=h.done[k]||0,lv=levelOf(h,v),n=(h.notes||{})[k],u=esc(h.unit);
+    const txt=v?`<b>${v} ${u}</b> · ${LN[lv]}`:(today?'Not logged yet':`<b>0 ${u}</b> · None`);
+    return `<div class="pl"><i class="pd" style="background:var(--${v||!today?'l'+lv:'pend'})"></i>${one?'':esc(h.name)+': '}${txt}${n?`<div class="pn">${esc(n)}</div>`:''}</div>`};
+  out+=one?line(one):H.filter(h=>h.created<=k).map(line).join('');
+  if(one&&!S.open)out+=`<button class="btn sv" style="margin-top:10px" data-editday="${one.id}|${k}">Edit this day</button>`;
+  return out}
+function showPop(c,pin){
+  if(!pop.el){pop.el=document.createElement('div');pop.el.id='pop';pop.el.setAttribute('role','tooltip');document.body.appendChild(pop.el)}
+  const p=pop.el;p.innerHTML=popHTML(c.dataset.pk,c.dataset.ph);p.hidden=false;
+  const r=c.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
+  p.style.left=Math.max(8,Math.min(r.left+r.width/2-w/2,innerWidth-w-8))+'px';
+  p.style.top=(r.top-h-8<8?r.bottom+8:r.top-h-8)+'px';
+  pop.cell=c;pop.pinned=!!pin;pop.key=c.dataset.pk+'|'+c.dataset.ph}
+function hidePop(){if(pop.el)pop.el.hidden=true;pop.cell=null;pop.pinned=false;pop.key=''}
+document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.heat [data-pk]');if(c&&!pop.pinned)showPop(c,false)});
+document.addEventListener('mouseout',e=>{if(!pop.pinned&&e.target.closest&&e.target.closest('.heat [data-pk]'))hidePop()});
+document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest('.heat [data-pk]');
+  if(!c){if(!e.target.closest('#pop'))hidePop();return}
+  if(pop.pinned&&pop.key===c.dataset.pk+'|'+c.dataset.ph){hidePop();return}
+  const live=[...document.querySelectorAll('.heat [data-pk]')].find(x=>x.dataset.pk===c.dataset.pk&&x.dataset.ph===c.dataset.ph&&x.offsetParent!==null)||c;
+  showPop(live,true)});
+window.addEventListener('scroll',hidePop,{passive:true});window.addEventListener('resize',hidePop);
 const msg=t=>{$('msg').textContent=t};
 const authErr=e=>msg(({'auth/invalid-credential':'Wrong email or password.','auth/email-already-in-use':'That email already has an account. Sign in instead.','auth/weak-password':'Use a password with at least 6 characters.','auth/invalid-email':'Enter a valid email address.','auth/operation-not-allowed':'Email sign-in is not enabled in Firebase yet.'})[e.code]||'Could not sign in ('+e.code+').');
 $('login').addEventListener('submit',e=>{e.preventDefault();msg('');signInWithEmailAndPassword(auth,$('email').value,$('pass').value).catch(authErr)});
