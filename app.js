@@ -69,7 +69,7 @@ function streakHTML(h){const n=streak(h),bst=best(h),tier=n>=30?4:n>=14?3:n>=7?2
   return `<span class="streak s${tier}" title="Best streak: ${bst} days"><span class="flame">🔥</span><b>${n}</b> day${n===1?'':'s'}</span><span>Best <b>${bst}</b></span>${risk}`}
 function logHTML(h,k,sv=true){const dk=h.id+'|'+k,cur=h.done[k]>0?h.done[k]:((h.skip||{})[k]?0:null),dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==cur,v=dirty?S.draft[dk]:cur,lv=v===null?-1:levelOf(h,v),u=esc(h.unit);
   return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v===null?'':v}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
-  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${lv<0?(k===K(T())?'Not logged yet':'Not logged'):LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
+  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}"></button>`).join('')+`<span class="lvname">${lv<0?(k===K(T())?'Not logged yet':'Not logged'):LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
 function markUnsaved(row){S.saved=false;const ss=$('savestate');if(ss)ss.textContent='Unsaved changes';const u=row&&row.querySelector('.uns');if(u)u.textContent='Unsaved'}
 function saveDay(h,k){const dk=h.id+'|'+k;if(S.draft&&dk in S.draft){setAmt(h,k,S.draft[dk]);delete S.draft[dk]}
   const n=$('note');if(n){const v=n.value;if(v.trim())h.notes[k]=v;else delete h.notes[k]}S.noteDraft=null;S.saved=true}
@@ -102,6 +102,7 @@ function renderNotes(h){const ks=Object.keys(h.notes||{}).filter(k=>h.notes[k]).
 function renderDetail(h){const k=S.day||K(T());S.day=k;
   $('detail').innerHTML=`<button class="rm" data-back="1">← All habits</button>
   <h2 class="dname">${esc(h.name)}</h2>
+  <div class="dayrow"><input id="nameIn" value="${esc(h.name)}" maxlength="60" aria-label="Habit name"><button class="btn sv" data-rename="1">Rename</button></div>
   <div class="meta">${streakHTML(h)}<span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
   <h2 style="margin-top:16px">Heatmap</h2><div class="scroll"><div class="heat" id="heatH">${heatCells(h,S.habits,periods())}</div></div>
   <div class="legend">None ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} Best · <i class="lgm"></i> Not logged (counts as 0) · Hover or click a day for details</div>
@@ -123,6 +124,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
   else if(t.dataset.lvl){const [id,k,i]=t.dataset.lvl.split('|');const h=S.habits.find(x=>x.id===id);if(h){(S.draft=S.draft||{})[id+'|'+k]=levelAmt(h,+i);S.saved=false}}
   else if(t.dataset.save){const [id,k]=t.dataset.save.split('|');const h=S.habits.find(x=>x.id===id);if(h){if(S.draft&&t.dataset.save in S.draft){setAmt(h,k,S.draft[t.dataset.save]);delete S.draft[t.dataset.save]}}}
   else if(t.dataset.saveday){const h=S.habits.find(x=>x.id===S.open);if(h)saveDay(h,S.day)}
+  else if(t.dataset.rename){const h=S.habits.find(x=>x.id===S.open),v=$('nameIn').value.trim();if(h&&v)h.name=v}
   else if(t.dataset.day){if(S.open){S.day=t.dataset.day;S.draft={};S.noteDraft=null;S.saved=false}else{return}}
   else if(t.dataset.open){S.open=t.dataset.open;S.day=K(T());S.draft={};S.noteDraft=null;S.saved=false;window.scrollTo(0,0)}
   else if(t.dataset.back){S.open=null;S.sel='all';S.draft={};S.noteDraft=null}
@@ -181,6 +183,7 @@ document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest
   const live=[...document.querySelectorAll('.heat [data-pk]')].find(x=>x.dataset.pk===c.dataset.pk&&x.dataset.ph===c.dataset.ph&&x.offsetParent!==null)||c;
   showPop(live,true)});
 window.addEventListener('scroll',hidePop,{passive:true});window.addEventListener('resize',hidePop);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nameIn'){e.preventDefault();const b=document.querySelector('[data-rename]');if(b)b.click()}});
 const msg=t=>{$('msg').textContent=t};
 const authErr=e=>msg(({'auth/invalid-credential':'Wrong email or password.','auth/email-already-in-use':'That email already has an account. Sign in instead.','auth/weak-password':'Use a password with at least 6 characters.','auth/invalid-email':'Enter a valid email address.','auth/operation-not-allowed':'Email sign-in is not enabled in Firebase yet.'})[e.code]||'Could not sign in ('+e.code+').');
 $('login').addEventListener('submit',e=>{e.preventDefault();msg('');signInWithEmailAndPassword(auth,$('email').value,$('pass').value).catch(authErr)});
