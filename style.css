@@ -82,3 +82,22 @@ label{display:block;font-weight:600;font-size:14px;color:var(--mute)}
 .ph{font-weight:600;margin-bottom:6px}.pl{margin-top:6px}.pl:first-of-type{margin-top:0}
 .pd{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .pn{white-space:pre-wrap;color:var(--mute);margin-top:4px;max-height:140px;overflow:auto;border-left:3px solid var(--line);padding-left:8px}
+.streak{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 8px;border-radius:999px;font-weight:600;font-size:14px;color:#fff;position:relative;overflow:hidden;background:linear-gradient(135deg,#b4231a,#f26a1b)}
+.meta .streak b{color:#fff;font-size:18px}
+.streak::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%);transform:translateX(-130%);animation:shine 3.2s ease-in-out infinite}
+.flame{display:inline-block;transform-origin:50% 90%;animation:flicker 1.4s ease-in-out infinite;filter:drop-shadow(0 0 5px #ffb347)}
+.s0{background:linear-gradient(135deg,#a3361b,#e8772b)}
+.s1{background:linear-gradient(135deg,#b4231a,#f26a1b)}
+.s2{background:linear-gradient(135deg,#9d1420,#e8381e 55%,#f59e0b);animation:glow 2.2s ease-in-out infinite}
+.s2 .flame{font-size:18px}
+.s3{background:linear-gradient(135deg,#7f0f1f,#d62b1c 50%,#ff9d1a);animation:glow 1.8s ease-in-out infinite}
+.s3 .flame{font-size:21px}
+.s4{background:linear-gradient(135deg,#6b0a22,#d11f2b 40%,#ff8a1a 75%,#ffd54a);animation:glow 1.4s ease-in-out infinite;font-size:15px}
+.s4 .flame{font-size:24px;filter:drop-shadow(0 0 9px #ffd54a)}
+.s-off{background:var(--pend);color:var(--mute)}.s-off::after{display:none}.s-off .flame{filter:grayscale(1) opacity(.45);animation:none}
+.risk{font-size:13px;font-weight:600;color:#e04b45}
+.ver{color:var(--mute);font-size:12px;text-align:center;margin-top:24px}
+@keyframes shine{0%{transform:translateX(-130%)}55%,100%{transform:translateX(130%)}}
+@keyframes flicker{0%,100%{transform:scale(1) rotate(-3deg)}25%{transform:scale(1.14) rotate(3deg)}50%{transform:scale(.95) rotate(-1deg)}75%{transform:scale(1.1) rotate(4deg)}}
+@keyframes glow{0%,100%{box-shadow:0 0 5px rgba(245,120,20,.45)}50%{box-shadow:0 0 16px rgba(255,110,20,.95)}}
+@media (prefers-reduced-motion:reduce){.streak,.streak::after,.flame{animation:none!important}}

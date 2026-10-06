@@ -57,6 +57,11 @@ function heatCells(one,H,P){
     const pend=k===K(P.t)&&(one?!one.done[k]:!H.some(h=>h.created<=k&&h.done[k]));
     cells+=`<button class="${pend?'pend':'l'+lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${pend?'':shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} data-pk="${k}" data-ph="${one?one.id:''}" aria-label="${label}"></button>`}
   return cells}
+// Streak badge: the flame grows and glows as the streak gets longer
+function streakHTML(h){const n=streak(h),bst=best(h),tier=n>=30?4:n>=14?3:n>=7?2:n>=3?1:n>=1?0:-1;
+  const risk=n&&!h.done[K(T())]?'<span class="risk">Log today to keep it going</span>':'';
+  if(tier<0)return `<span class="streak s-off"><span class="flame">🔥</span>No streak yet</span><span>Best <b>${bst}</b></span>`;
+  return `<span class="streak s${tier}" title="Best streak: ${bst} days"><span class="flame">🔥</span><b>${n}</b> day${n===1?'':'s'}</span><span>Best <b>${bst}</b></span>${risk}`}
 function logHTML(h,k,sv=true){const dk=h.id+'|'+k,dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==(h.done[k]||0),v=dirty?S.draft[dk]:(h.done[k]||0),lv=levelOf(h,v),u=esc(h.unit);
   return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v||''}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
   LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
@@ -82,7 +87,7 @@ function render(){
 
   $('list').innerHTML=n?H.map(h=>{const w=count(h,P.wk,P.t),m=count(h,P.mo,P.t),sw=span(h,P.wk);
     return `<div class="habit">
-    <div><button class="name nm" data-open="${h.id}">${esc(h.name)}</button>${h.desc?`<div class="desc">${esc(h.desc)}</div>`:''}<div class="meta"><span>Streak <b>${streak(h)}</b> days</span><span>Best <b>${best(h)}</b></span><button class="rm" data-rm="${h.id}">Remove</button></div><div class="logrow">Today ${logHTML(h,K(P.t))}</div></div>
+    <div><button class="name nm" data-open="${h.id}">${esc(h.name)}</button>${h.desc?`<div class="desc">${esc(h.desc)}</div>`:''}<div class="meta">${streakHTML(h)}<button class="rm" data-rm="${h.id}">Remove</button></div><div class="logrow">Today ${logHTML(h,K(P.t))}</div></div>
     <div class="bars"><div>Week: ${w} of ${sw} days · ${sumAmt(h,P.wk,P.t)} ${esc(h.unit)}<div class="bar"><i style="width:${pct(w,sw)}%"></i></div></div><div>Month: ${m} of ${P.moTotal} days · ${sumAmt(h,P.mo,P.t)} ${esc(h.unit)}<div class="bar"><i style="width:${pct(m,P.moTotal)}%"></i></div></div></div></div>`}).join('')
     :'<p class="empty">Add your first habit above. Name it by the action, like “Walk 30 minutes”.</p>';
 }
@@ -92,7 +97,7 @@ function renderNotes(h){const ks=Object.keys(h.notes||{}).filter(k=>h.notes[k]).
 function renderDetail(h){const k=S.day||K(T());S.day=k;
   $('detail').innerHTML=`<button class="rm" data-back="1">← All habits</button>
   <h2 class="dname">${esc(h.name)}</h2>
-  <div class="meta"><span>Streak <b>${streak(h)}</b> days</span><span>Best <b>${best(h)}</b></span><span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
+  <div class="meta">${streakHTML(h)}<span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
   <h2 style="margin-top:16px">Heatmap</h2><div class="scroll"><div class="heat" id="heatH">${heatCells(h,S.habits,periods())}</div></div>
   <div class="legend">None ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} Best · Hover or click a day for details</div>
   <label for="goalAmt" style="margin-top:14px">Daily goal</label>
