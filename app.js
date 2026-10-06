@@ -33,14 +33,19 @@ const dateOf=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)
 // Levels are relative to the daily goal: Lowest <50%, Low 50%+, Normal 100%+, Better 150%+, Best 200%+
 const levelOf=(h,v)=>{if(!(v>0))return 0;const r=v/h.goal;return r>=2?5:r>=1.5?4:r>=1?3:r>=.5?2:1};
 const levelAmt=(h,n)=>Math.round([0,.25,.5,1,1.5,2][n]*h.goal*10)/10;
-function setAmt(h,k,v){v=Math.max(0,Number(v)||0);if(v>0){h.done[k]=v;if(k<h.created)h.created=k}else delete h.done[k]}
+// v: number>0 = amount, 0 = deliberately skipped, null = back to not logged
+function setAmt(h,k,v){h.skip=h.skip||{};
+  if(v===null||v===undefined){delete h.done[k];delete h.skip[k];return}
+  v=Math.max(0,Number(v)||0);
+  if(v>0){h.done[k]=v;delete h.skip[k]}else{delete h.done[k];h.skip[k]=1}
+  if(k<h.created)h.created=k}
 function norm(h){if(!h.goal){h.goal=30;h.unit='min';for(const k in h.done)h.done[k]=30}
-  h.unit=h.unit||'min';h.notes=h.notes||{};if(!h.created)h.created=Object.keys(h.done).sort()[0]||K(T())}
+  h.unit=h.unit||'min';h.notes=h.notes||{};h.skip=h.skip||{};if(!h.created)h.created=Object.keys(h.done).sort()[0]||K(T())}
 const span=(h,from)=>{const c=dateOf(h.created),f=c>from?c:from;return Math.max(1,Math.round((T()-f)/864e5)+1)};
 const sumAmt=(h,from,to)=>{let n=0;for(let d=from;d<=to;d=add(d,1))n+=h.done[K(d)]||0;return Math.round(n*10)/10};
 // Shade inside a level: 15 min and 20 min share a level color but 20 min is slightly stronger
 const levelFrac=(h,v)=>{const r=v/h.goal;return Math.min(1,r>=2?r-2:r>=1.5?(r-1.5)*2:r>=1?(r-1)*2:r>=.5?(r-.5)*2:r*2)};
-const shade=(lv,t)=>lv?` style="background:color-mix(in srgb,var(--l${lv}) ${Math.round(65+35*t)}%,var(--card))"`:'';
+const shade=(lv,t)=>lv?` style="background-color:color-mix(in srgb,var(--l${lv}) ${Math.round(65+35*t)}%,var(--card))"`:'';
 // Standard grid of W weeks. It starts in the week of the first day (earlier days stay blank),
 // future days are empty squares, and it slides forward once the habit is older than W weeks.
 function heatCells(one,H,P){
@@ -51,20 +56,20 @@ function heatCells(one,H,P){
     if(d<first){cells+='<div class="pre"></div>';continue}
     if(d>P.t){cells+='<div class="fut" data-pk="'+k+'" data-ph="'+(one?one.id:'')+'"></div>';continue}
     const ds=d.toLocaleDateString(undefined,{day:'numeric',month:'short'});let lv,t=0,label;
-    if(one){const v=one.done[k]||0;lv=levelOf(one,v);t=v?levelFrac(one,v):0;label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':(k===K(P.t)?'not logged yet':'0 '+one.unit))}
+    if(one){const v=one.done[k]||0;lv=levelOf(one,v);t=v?levelFrac(one,v):0;label=ds+': '+(v?v+' '+one.unit+' ('+LN[lv]+')':((one.skip||{})[k]?'skipped (0 '+one.unit+')':k===K(P.t)?'not logged yet':'not logged, counted as 0'))}
     else{const act=H.filter(h=>h.created<=k),sum=act.reduce((a,h)=>a+levelOf(h,h.done[k]||0),0),avg=act.length?sum/act.length:0;
       lv=sum?Math.max(1,Math.min(5,Math.round(avg))):0;t=lv?Math.min(1,Math.max(0,avg-lv+.5)):0;label=ds+': '+act.filter(h=>h.done[k]).length+' of '+act.length+' habits done'}
-    const pend=k===K(P.t)&&(one?!one.done[k]:!H.some(h=>h.created<=k&&h.done[k]));
-    cells+=`<button class="${pend?'pend':'l'+lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${pend?'':shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} data-pk="${k}" data-ph="${one?one.id:''}" aria-label="${label}"></button>`}
+    const isT=k===K(P.t),lg=h=>h.done[k]>0||!!(h.skip||{})[k],logged=one?lg(one):H.some(h=>h.created<=k&&lg(h)),pend=isT&&!logged,miss=!isT&&!logged;
+    cells+=`<button class="${pend?'pend':miss?'miss':'l'+lv}${one?' edit':''}${k===K(P.t)?' now':''}${S.open&&one&&k===S.day?' sel':''}${one&&one.notes&&one.notes[k]?' hn':''}"${pend||miss?'':shade(lv,t)} ${one?`data-day="${k}"`:'tabindex="-1"'} data-pk="${k}" data-ph="${one?one.id:''}" aria-label="${label}"></button>`}
   return cells}
 // Streak badge: the flame grows and glows as the streak gets longer
 function streakHTML(h){const n=streak(h),bst=best(h),tier=n>=30?4:n>=14?3:n>=7?2:n>=3?1:n>=1?0:-1;
   const risk=n&&!h.done[K(T())]?'<span class="risk">Log today to keep it going</span>':'';
   if(tier<0)return `<span class="streak s-off"><span class="flame">🔥</span>No streak yet</span><span>Best <b>${bst}</b></span>`;
   return `<span class="streak s${tier}" title="Best streak: ${bst} days"><span class="flame">🔥</span><b>${n}</b> day${n===1?'':'s'}</span><span>Best <b>${bst}</b></span>${risk}`}
-function logHTML(h,k,sv=true){const dk=h.id+'|'+k,dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==(h.done[k]||0),v=dirty?S.draft[dk]:(h.done[k]||0),lv=levelOf(h,v),u=esc(h.unit);
-  return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v||''}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
-  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
+function logHTML(h,k,sv=true){const dk=h.id+'|'+k,cur=h.done[k]>0?h.done[k]:((h.skip||{})[k]?0:null),dirty=!!S.draft&&dk in S.draft&&S.draft[dk]!==cur,v=dirty?S.draft[dk]:cur,lv=v===null?-1:levelOf(h,v),u=esc(h.unit);
+  return `<span class="log"><input type="number" min="0" step="any" inputmode="decimal" value="${v===null?'':v}" placeholder="0" data-amt="${h.id}|${k}" aria-label="${u} done"><span>${u}</span>`+
+  LN.map((nm,i)=>`<button class="lv l${i}" data-lvl="${h.id}|${k}|${i}" aria-pressed="${i===lv}" title="${nm}${i?' ('+levelAmt(h,i)+' '+u+')':''}" aria-label="${nm}">${i?'':'✕'}</button>`).join('')+`<span class="lvname">${lv<0?(k===K(T())?'Not logged yet':'Not logged'):LN[lv]}</span>`+(sv?`<button class="btn sv" data-save="${dk}">Save</button>`:'')+`<span class="uns">${dirty?'Unsaved':''}</span></span>`}
 function markUnsaved(row){S.saved=false;const ss=$('savestate');if(ss)ss.textContent='Unsaved changes';const u=row&&row.querySelector('.uns');if(u)u.textContent='Unsaved'}
 function saveDay(h,k){const dk=h.id+'|'+k;if(S.draft&&dk in S.draft){setAmt(h,k,S.draft[dk]);delete S.draft[dk]}
   const n=$('note');if(n){const v=n.value;if(v.trim())h.notes[k]=v;else delete h.notes[k]}S.noteDraft=null;S.saved=true}
@@ -83,7 +88,7 @@ function render(){
   $('chips').innerHTML=`<button class="chip" data-sel="all" aria-pressed="${S.sel==='all'}">All habits</button>`+H.map(h=>`<button class="chip" data-sel="${h.id}" aria-pressed="${S.sel===h.id}">${esc(h.name)}</button>`).join('');
   const one=H.find(h=>h.id===S.sel);if(!one)S.sel='all';
   $('heat').innerHTML=heatCells(one,H,P);
-  $('legend').innerHTML='None '+[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')+' Best · Hover or click a day for details';
+  $('legend').innerHTML='None '+[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')+' Best · <i class="lgm"></i> Not logged (counts as 0) · Hover or click a day for details';
 
   $('list').innerHTML=n?H.map(h=>{const w=count(h,P.wk,P.t),m=count(h,P.mo,P.t),sw=span(h,P.wk);
     return `<div class="habit">
@@ -99,14 +104,14 @@ function renderDetail(h){const k=S.day||K(T());S.day=k;
   <h2 class="dname">${esc(h.name)}</h2>
   <div class="meta">${streakHTML(h)}<span>Done <b>${Object.keys(h.done).length}</b> days in total</span></div>
   <h2 style="margin-top:16px">Heatmap</h2><div class="scroll"><div class="heat" id="heatH">${heatCells(h,S.habits,periods())}</div></div>
-  <div class="legend">None ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} Best · Hover or click a day for details</div>
+  <div class="legend">None ${[0,1,2,3,4,5].map(i=>`<i style="background:var(--l${i})"></i>`).join('')} Best · <i class="lgm"></i> Not logged (counts as 0) · Hover or click a day for details</div>
   <label for="goalAmt" style="margin-top:14px">Daily goal</label>
   <div class="dayrow"><input type="number" id="goalAmt" min="1" step="any" value="${h.goal}" style="flex:0 0 110px"><input id="unitIn" value="${esc(h.unit)}" maxlength="12" style="flex:0 0 90px" aria-label="Unit"></div>
   <label for="desc">Description (optional)</label>
   <textarea id="desc" rows="2" placeholder="What are you aiming for, and why?">${esc(h.desc||'')}</textarea>
   <label for="dayPick">Day</label>
   <div class="dayrow"><input type="date" id="dayPick" value="${k}" max="${K(T())}">${logHTML(h,k,false)}</div>
-  <p class="hint">Lowest = under half your goal · Low = half · Normal = your goal · Better = 1.5× · Best = 2×</p>
+  <p class="hint">Lowest = under half your goal · Low = half · Normal = your goal · Better = 1.5× · Best = 2×. Leave the box empty for "not logged" (counts as 0), or press the red ✕ to record a skipped day.</p>
   <textarea id="note" rows="4" aria-label="Note for ${fmt(k)}" placeholder="Note for ${fmt(k)} (optional)">${esc(S.noteDraft&&S.noteDraft.k===k?S.noteDraft.v:(h.notes||{})[k]||'')}</textarea>
   <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>
   <h2>All notes</h2><div id="notelist"></div>`;
@@ -140,10 +145,10 @@ document.addEventListener('change',e=>{const h=S.habits.find(x=>x.id===S.open);i
   else if(id==='note')renderNotes(h)});
 document.addEventListener('input',e=>{const a=e.target.dataset&&e.target.dataset.amt;if(!a)return;
   const h=S.habits.find(x=>x.id===a.split('|')[0]);if(!h)return;
-  const v=Math.max(0,Number(e.target.value)||0);(S.draft=S.draft||{})[a]=v;
-  const row=e.target.closest('.log'),lv=levelOf(h,v);
+  const raw=e.target.value,v=raw===''?null:Math.max(0,Number(raw)||0);(S.draft=S.draft||{})[a]=v;
+  const row=e.target.closest('.log'),lv=v===null?-1:levelOf(h,v);
   row.querySelectorAll('.lv').forEach((b,i)=>b.setAttribute('aria-pressed',i===lv));
-  row.querySelector('.lvname').textContent=LN[lv];markUnsaved(row)});
+  row.querySelector('.lvname').textContent=lv<0?'Not logged':LN[lv];markUnsaved(row)});
 const root=document.documentElement;
 const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
 const paintTheme=()=>{$('theme').textContent=isDark()?'☀ Light mode':'☾ Dark mode'};
@@ -154,9 +159,9 @@ function popHTML(k,hid){
   const P=periods(),H=S.habits,d=dateOf(k),today=k===K(P.t),one=hid&&H.find(x=>x.id===hid);
   let out=`<div class="ph">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short',year:'numeric'})}</div>`;
   if(d>P.t)return out+'<div class="pl">Upcoming</div>';
-  const line=h=>{const v=h.done[k]||0,lv=levelOf(h,v),n=(h.notes||{})[k],u=esc(h.unit);
-    const txt=v?`<b>${v} ${u}</b> · ${LN[lv]}`:(today?'Not logged yet':`<b>0 ${u}</b> · None`);
-    return `<div class="pl"><i class="pd" style="background:var(--${v||!today?'l'+lv:'pend'})"></i>${one?'':esc(h.name)+': '}${txt}${n?`<div class="pn">${esc(n)}</div>`:''}</div>`};
+  const line=h=>{const v=h.done[k]||0,sk=!!(h.skip||{})[k],lv=levelOf(h,v),n=(h.notes||{})[k],u=esc(h.unit);
+    const txt=v?`<b>${v} ${u}</b> · ${LN[lv]}`:sk?`<b>0 ${u}</b> · Skipped`:(today?'Not logged yet':'Not logged · counted as 0');
+    return `<div class="pl"><i class="pd${!v&&!sk&&!today?' miss':''}" style="${v||sk?'background:var(--l'+lv+')':today?'background:var(--pend)':''}"></i>${one?'':esc(h.name)+': '}${txt}${n?`<div class="pn">${esc(n)}</div>`:''}</div>`};
   out+=one?line(one):H.filter(h=>h.created<=k).map(line).join('');
   if(one&&!S.open)out+=`<button class="btn sv" style="margin-top:10px" data-editday="${one.id}|${k}">Edit this day</button>`;
   return out}
