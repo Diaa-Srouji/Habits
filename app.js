@@ -85,7 +85,11 @@ function gradColor(s){s=Math.max(0,Math.min(1,s));let i=1;while(i<GRAD.length-1&
 const GH=[[0,'#D4F5DA'],[.35,'#8FE0A0'],[.6,'#3FC463'],[.8,'#2E9E4F'],[1,'#14602E']].map(([p,c])=>[p,[1,3,5].map(i=>parseInt(c.slice(i,i+2),16))]);
 function ghColor(s){if(!(s>0))return 'rgb(224,51,76)';s=Math.min(1,s);let i=1;while(i<GH.length-1&&s>GH[i][0])i++;
   const [p0,a]=GH[i-1],[p1,b]=GH[i],f=(s-p0)/(p1-p0);return 'rgb('+a.map((x,j)=>Math.round(x+(b[j]-x)*f)).join(',')+')'}
-const scoreColor=s=>document.documentElement.dataset.palette==='github'?ghColor(s):gradColor(s);
+// Default palette: red -> yellow -> green, changing smoothly with the amount
+const RG=[[0,'#A50026'],[.2,'#F46D43'],[.4,'#FEE08B'],[.6,'#A6D96A'],[.8,'#1A9850'],[1,'#006837']].map(([p,c])=>[p,[1,3,5].map(i=>parseInt(c.slice(i,i+2),16))]);
+function rgColor(s){s=Math.max(0,Math.min(1,s));let i=1;while(i<RG.length-1&&s>RG[i][0])i++;
+  const [p0,a]=RG[i-1],[p1,b]=RG[i],f=(s-p0)/(p1-p0);return 'rgb('+a.map((x,j)=>Math.round(x+(b[j]-x)*f)).join(',')+')'}
+const scoreColor=s=>{const p=document.documentElement.dataset.palette;return p==='github'?ghColor(s):p==='cool'?gradColor(s):rgColor(s)};
 // 0..1 score of a day: regular = more is better (goal reached is about 0.57), stop = less is better
 const dayScore=(h,v)=>{if(h.type==='bool')return (h.stop?v<=0:v>0)?.9:0;
   const r=Math.min(1,v/(2*h.goal));return h.stop?1-r:(v>0?.15+.85*r:0)};
