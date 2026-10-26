@@ -1,0 +1,25 @@
+{
+  "name": "habit-tracker",
+  "private": true,
+  "version": "16.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check:sync": "node tools/sync-sim/run.mjs",
+    "test:unit": "node --test tests/scoring.test.mjs tests/sw-precache.test.mjs",
+    "test": "npm run test:unit && npm run check:sync",
+    "deploy": "npm test && npm run build && npx firebase-tools deploy --only hosting",
+    "deploy:rules": "npx firebase-tools deploy --only firestore:rules"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

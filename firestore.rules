@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+
+      // The OLD single document (before Part 7). The app only reads it, once, to move
+      // your data. Nobody can change it any more, so it stays as a backup.
+      allow read: if isOwner(uid);
+      allow write: if false;
+
+      // One document per habit
+      match /habits/{habitId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.id == habitId
+          && request.resource.data.name is string
+          && request.resource.data.done is map;
+      }
+
+      // Categories. This document also marks "the move is done", so it can never be deleted.
+      match /meta/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && request.resource.data.cats is map;
+        allow delete: if false;
+      }
+    }
+  }
+}
