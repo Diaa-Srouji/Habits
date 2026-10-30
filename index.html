@@ -15,13 +15,12 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Habit tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;600;800&display=swap" rel="stylesheet">
-<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;var p=localStorage.getItem("palette");if(p)document.documentElement.dataset.palette=p}catch(e){}</script>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
 <main>
-  <div class="tools"><select id="palette" class="chip themebtn" aria-label="Heatmap colors"><option value="gradient">Colors: Red → green</option><option value="github">Colors: GitHub green</option><option value="cool">Colors: Cool gradient</option></select>
-  <button id="theme" class="chip themebtn" type="button">Dark mode</button></div>
+  <div class="tools"><button id="theme" class="chip themebtn" type="button">Dark mode</button></div>
   <h1><a class="homelink" href="#/">Habits</a></h1>
   <p class="sub" id="date"></p>
   <p class="sub" id="who" hidden><span id="mail"></span> · <button class="rm" id="exp" type="button">Export backup</button> · <button class="rm" id="imp" type="button">Import</button> · <button class="rm" id="out">Sign out</button><br><span id="sync" role="status"></span></p>
@@ -36,16 +35,20 @@
   <form id="add" aria-labelledby="addT">
     <h2 id="addT" class="addt">Add a habit</h2>
     <input id="name" placeholder="New habit, e.g. Read 20 pages" maxlength="60" aria-label="New habit name" required>
-    <select id="type" aria-label="Habit type"><option value="min">Minutes</option><option value="hour">Hours</option><option value="pages">Pages or chapters</option><option value="problems">Problems (solved or tried)</option><option value="times">Number of times</option><option value="bool">True / false</option></select>
+    <select id="type" aria-label="Habit kind"><option value="num">Number (minutes, pages, times…)</option><option value="bool">True / false</option><option value="text">Text with a percentage</option></select>
     <select id="cat" aria-label="Category"></select>
-    <label class="ck" id="stopWrap"><input type="checkbox" id="stop"> Stop habit (less is better)</label>
-    <select id="sub" aria-label="Unit" hidden></select>
-    <span id="goalWrap" class="goalwrap"><label for="goal" id="goalLbl">Daily goal</label><input id="goal" type="number" min="0" step="any" value="30" aria-label="Daily goal"><span id="goalUnit">min</span></span>
+    <select id="grp" aria-label="Group (optional)" hidden></select>
+    <label class="ck" id="stopWrap"><input type="checkbox" id="stop"> <span id="stopLbl">Stop habit (less is better)</span></label>
+    <span id="fqWrap" class="goalwrap"><label for="newFqMode">How often</label><select id="newFqMode" aria-label="How often"><option value="">Every day</option><option value="p">Periodic</option></select><span id="newFqBox" class="goalwrap" hidden><input id="newFqN" type="number" min="1" max="365" step="1" value="3" aria-label="How many"><select id="newFqPer" aria-label="Period"><option value="week">times per week</option><option value="month">times per month</option><option value="days">days apart (every X days)</option></select></span></span>
+    <span id="newFqPrev" class="hint fqprev" role="status"></span>
+    <input id="unit" placeholder="Unit, e.g. min, pages, times" maxlength="24" aria-label="Unit">
+    <span id="goalWrap" class="goalwrap"><label for="goal" id="goalLbl">Daily goal</label><input id="goal" type="number" min="0" step="any" value="30" aria-label="Daily goal"><span id="goalUnit"></span></span>
+    <span class="goalwrap"><label for="impt">Importance</label><select id="impt" aria-label="Importance (weight when habits are combined)"><option value="1">1 · Minor</option><option value="2">2 · Low</option><option value="3" selected>3 · Normal</option><option value="4">4 · High</option><option value="5">5 · Critical</option></select></span>
     <button class="btn">Add habit</button>
   </form>
   <section id="detail" hidden></section>
 </div>
-<p class="ver">Version 16 · Done by Diaa</p>
+<p class="ver">Version 19 · Done by Diaa</p>
 </main>
 <script type="module" src="src/main.js"></script>
 </body>

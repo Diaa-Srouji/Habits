@@ -2,7 +2,7 @@
 import {S} from './state.js';
 import {$,K,T} from './util.js';
 import {render} from './render.js';
-import {watchAuth} from './sync.js';
+import {watchAuth,syncNow,setSync} from './sync.js';
 import {initEvents} from './events.js';
 import {initHeatmapEvents} from './heatmap.js';
 import {initRouter} from './router.js';
@@ -24,6 +24,12 @@ watchAuth({
   onRemote(){if(!(document.activeElement&&document.activeElement.tagName==='TEXTAREA'))render()}
 });
 
+// Offline / back online: say so, and send everything saved on this device as soon as the connection returns
+addEventListener('offline',()=>setSync('Offline · your changes are saved on this device'));
+addEventListener('online',()=>{setSync('Back online · syncing…');syncNow()});
+// Installed app: ask the browser not to clear this device's saved copy when space runs low
+try{if(navigator.storage&&navigator.storage.persist&&matchMedia('(display-mode: standalone)').matches)navigator.storage.persist()}catch(e){}
+
 // Installable / offline: only in the built site (not in `npm run dev`), only on https or localhost
-if('serviceWorker'in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))  
+if('serviceWorker'in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))
 addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));

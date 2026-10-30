@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:sync": "node tools/sync-sim/run.mjs",
-    "test:unit": "node --test tests/scoring.test.mjs tests/sw-precache.test.mjs",
+    "test:unit": "node --test tests/scoring.test.mjs tests/stats.test.mjs tests/periodic.test.mjs tests/sw-precache.test.mjs",
     "test": "npm run test:unit && npm run check:sync",
     "deploy": "npm test && npm run build && npx firebase-tools deploy --only hosting",
     "deploy:rules": "npx firebase-tools deploy --only firestore:rules"

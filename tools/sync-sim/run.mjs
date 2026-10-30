@@ -243,6 +243,39 @@ await scenario('8. Rules not published yet / network trouble show a clear messag
   FS.commit=orig;assert.equal(hOf(A,'hk1a').goal,50);ok('the edit is still on the device');
   A.edit(()=>{hOf(A,'hk1a').goal=51});await settle();assert.equal(hdoc('hk1a').goal,51);ok('and goes out with the next save once the rules are fixed')});
 
+await scenario('9. "What did you do?" and several notes per day merge across devices',async()=>{
+  seedOld();const A=await device('A'),B=await device('B');A.login(UID);await until(()=>A.status==='Synced ✓','A synced');B.login(UID);await until(()=>B.S.habits.length===3&&B.status==='Synced ✓','B synced');
+  const notes=(X,k)=>X.sc.dayNotes(hOf(X,'hk1a'),k).map(n=>n.t),keys=()=>Object.keys(hdoc('hk1a').nts||{});
+  // the old one-note-per-day text is converted by both devices (as the page does on every redraw) into the very same entry
+  A.edit(()=>A.S.habits.forEach(A.sc.norm));B.edit(()=>B.S.habits.forEach(B.sc.norm));await settle();
+  assert.deepEqual(keys(),[DAY[0]+'_old']);assert.equal(hdoc('hk1a').nts[DAY[0]+'_old'].t,'good one');assert.equal(Object.keys(hdoc('hk1a').notes||{}).length,0);ok('both devices converted the old note: ONE entry in the cloud, the old field is emptied');
+  assert.deepEqual(notes(A,DAY[0]),['good one']);assert.deepEqual(notes(B,DAY[0]),['good one']);ok('and each device still shows it exactly once');
+  // both add a note to the same day while the other is not looking
+  let ia,ib;
+  A.edit(()=>{ia=A.sc.addNote(hOf(A,'hk1a'),DAY[1]);A.sc.setNote(hOf(A,'hk1a'),DAY[1],ia,'note from A')});
+  B.edit(()=>{ib=B.sc.addNote(hOf(B,'hk1a'),DAY[1]);B.sc.setNote(hOf(B,'hk1a'),DAY[1],ib,'note from B')});await settle();
+  assert.notEqual(ia,ib);
+  for(const X of [A,B])assert.deepEqual(new Set(notes(X,DAY[1])),new Set(['note from A','note from B']));assert.equal(keys().length,3);ok('two notes added on the same day on two devices: both are kept on both devices');
+  // summaries on different days, and a summary + an edited note on the same day
+  A.edit(()=>{hOf(A,'hk1a').sum={...hOf(A,'hk1a').sum,[DAY[2]]:'Read chapter 3'}});B.edit(()=>{hOf(B,'hk1a').sum={...hOf(B,'hk1a').sum,[DAY[3]]:'Reviewed notes'};B.sc.setNote(hOf(B,'hk1a'),DAY[1],ib,'note from B (edited)')});await settle();
+  assert.equal(hdoc('hk1a').sum[DAY[2]],'Read chapter 3');assert.equal(hdoc('hk1a').sum[DAY[3]],'Reviewed notes');
+  for(const X of [A,B]){assert.equal(hOf(X,'hk1a').sum[DAY[2]],'Read chapter 3');assert.equal(hOf(X,'hk1a').sum[DAY[3]],'Reviewed notes');assert.ok(notes(X,DAY[1]).includes('note from B (edited)'))}ok('summaries of different days and an edited note all merge');
+  // delete on one device, unrelated edit on the other: the deleted note does NOT come back
+  A.edit(()=>A.sc.delNote(hOf(A,'hk1a'),DAY[0],'old'));await settle();
+  assert.equal(hdoc('hk1a').nts[DAY[0]+'_old'],undefined);assert.deepEqual(notes(B,DAY[0]),[]);ok('a note deleted on A disappears on B');
+  B.edit(()=>{B.sc.setAmt(hOf(B,'hk1a'),DAY[5],5)});await settle();
+  assert.equal(hdoc('hk1a').nts[DAY[0]+'_old'],undefined);assert.deepEqual(notes(A,DAY[0]),[]);ok('and B\'s next unrelated save does not bring it back');
+  // reordering: A moves a note up, B adds a third note meanwhile
+  const order=notes(A,DAY[1]);let ic;
+  A.edit(()=>{const ids=A.sc.dayNotes(hOf(A,'hk1a'),DAY[1]).map(n=>n.id);A.sc.moveNote(hOf(A,'hk1a'),DAY[1],ids[1],-1)});
+  B.edit(()=>{ic=B.sc.addNote(hOf(B,'hk1a'),DAY[1]);B.sc.setNote(hOf(B,'hk1a'),DAY[1],ic,'note from B 2')});await settle();
+  for(const X of [A,B]){const n=notes(X,DAY[1]);assert.equal(n.length,3);assert.equal(n[0],order[1],X.name+': the moved note is first');assert.equal(n[1],order[0]);assert.ok(n.includes('note from B 2'))}
+  assert.equal(JSON.stringify(notes(A,DAY[1])),JSON.stringify(notes(B,DAY[1])));ok('a manual reorder on A and a new note on B: both devices show the same order, nothing lost');
+  A.edit(()=>A.sc.resetNoteOrder(hOf(A,'hk1a'),DAY[1]));await settle();
+  assert.ok(Object.values(hdoc('hk1a').nts).every(v=>v.o===undefined));assert.equal(JSON.stringify(notes(A,DAY[1])),JSON.stringify(notes(B,DAY[1])));ok('"Sort by date" on A clears the manual order on B as well');
+  assert.equal(oldBytes(),JSON.stringify({data:JSON.stringify(OLD_HABITS()),cats:JSON.stringify(OLD_CATS()),updated:1000}));ok('old document still untouched');
+});
+
 console.log('\nAll '+passed+' checks passed.');
 fs.rmSync(TMP,{recursive:true,force:true});
 process.exit(0);

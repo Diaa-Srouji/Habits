@@ -1,7 +1,7 @@
-:root{--bg:#EEF1F4;--card:#fff;--ink:#14213D;--mute:#5B6B82;--line:#D5DBE3;--on:#0B6B4A;--l0:#A50026;--l1:#F46D43;--l2:#FEE08B;--l3:#A6D96A;--l4:#1A9850;--l5:#006837;--pend:#E1E6ED;
+:root{--bg:#EEF1F4;--card:#fff;--ink:#14213D;--mute:#5B6B82;--line:#D5DBE3;--on:#0B6B4A;--red:#D12A44;--g0:#BFEBC8;--g1:#17853B;--g2:#0A4D24;--glow:#38D47F;--pend:#E1E6ED;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1720;--card:#17212D;--ink:#E8EEF5;--mute:#8FA0B5;--line:#26334A;--on:#5FD8A8;--l0:#C4122F;--l1:#F46D43;--l2:#FEE08B;--l3:#A6D96A;--l4:#66BD63;--l5:#1A9850;--pend:#202C3B}}
-:root[data-theme="dark"]{--bg:#0F1720;--card:#17212D;--ink:#E8EEF5;--mute:#8FA0B5;--line:#26334A;--on:#5FD8A8;--l0:#C4122F;--l1:#F46D43;--l2:#FEE08B;--l3:#A6D96A;--l4:#66BD63;--l5:#1A9850;--pend:#202C3B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1720;--card:#17212D;--ink:#E8EEF5;--mute:#8FA0B5;--line:#26334A;--on:#5FD8A8;--red:#D32F45;--g0:#23553A;--g1:#2FBF6B;--g2:#8DF7B5;--glow:#8DF7B5;--on-g:#04210F;--pend:#202C3B}}
+:root[data-theme="dark"]{--bg:#0F1720;--card:#17212D;--ink:#E8EEF5;--mute:#8FA0B5;--line:#26334A;--on:#5FD8A8;--red:#D32F45;--g0:#23553A;--g1:#2FBF6B;--g2:#8DF7B5;--glow:#8DF7B5;--on-g:#04210F;--pend:#202C3B}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Bricolage Grotesque",system-ui,sans-serif}
@@ -22,11 +22,10 @@ button{font:inherit;cursor:pointer;color:var(--ink)}
 .bar i{display:block;height:100%;background:var(--on)}
 .chip{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 12px;font-size:14px}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.scroll{overflow-x:auto}
+.scroll{overflow-x:auto;padding:6px;margin:-6px}   /* room for the glow */
 .heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,auto);grid-auto-columns:minmax(14px,28px);gap:4px;justify-content:start}
 /* heatmap sizes: heat-lg (20 weeks, big) / heat-md (20 weeks, compact) / heat-sm (thin strip, last 28 days) */
-.heat>*{aspect-ratio:1;border-radius:4px;border:0;padding:0;background-color:var(--l0)}
-.heat .l1{background-color:var(--l1)}.heat .l2{background-color:var(--l2)}.heat .l3{background-color:var(--l3)}.heat .l4{background-color:var(--l4)}
+.heat>*{aspect-ratio:1;border-radius:4px;border:0;padding:0;background-color:var(--pend)}
 .heat .fut{background:none}.heat .now{outline:2px solid var(--ink);outline-offset:1px}
 .heat button.edit{cursor:pointer}.heat button:not(.edit){cursor:default}
 .legend{display:flex;align-items:center;gap:4px;margin-top:10px;color:var(--mute);font-size:13px}
@@ -54,20 +53,18 @@ label{display:block;font-weight:600;font-size:14px;color:var(--mute)}
 .heat .hn{position:relative}.heat .hn::after{content:"";position:absolute;right:3px;bottom:3px;width:5px;height:5px;border-radius:50%;background:var(--card);box-shadow:0 0 0 1px var(--ink)}
 #login{flex-wrap:wrap}#login input{flex:1 1 180px}
 .alt{background:none;color:var(--ink);border:1px solid var(--line)}
-.heat .l5{background-color:var(--l5)}
 #add{flex-wrap:wrap}#add #name{flex:1 1 200px}
 .log{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .log input{flex:none;width:84px;padding:6px 8px}
-.lv{width:28px;height:28px;border-radius:8px;border:2px solid transparent;padding:0;background-color:var(--l0)}
-.lv.l1{background-color:var(--l1)}.lv.l2{background-color:var(--l2)}.lv.l3{background-color:var(--l3)}.lv.l4{background-color:var(--l4)}.lv.l5{background-color:var(--l5)}
-.lv[aria-pressed="true"]{border-color:var(--ink)}
+.lv{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border-radius:8px;border:2px solid var(--line);background:var(--card);color:var(--ink);font-size:12px;font-weight:600}
+.lv i{flex:none;width:12px;height:12px;border-radius:3px;display:inline-block}
+.lv[aria-pressed="true"]{border-color:var(--ink);background:var(--pend)}
 .logrow{margin-top:8px;display:flex;align-items:center;gap:8px;color:var(--mute);font-size:14px}
 .hint{color:var(--mute);font-size:13px;margin:0 0 12px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark}}
 :root[data-theme="dark"]{color-scheme:dark}
 .themebtn{float:right;cursor:pointer;color:var(--ink)}
-.lv.l0{font-size:13px;line-height:1;color:#fff}
-.lvname{font-size:13px;font-weight:600;color:var(--ink);min-width:52px}
+.lvname{font-size:13px;font-weight:600;color:var(--ink);min-width:52px;white-space:nowrap}
 .sv{padding:6px 14px;font-size:14px}
 .uns,#savestate{font-size:13px;color:var(--mute)}
 .heat .fut{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
@@ -75,7 +72,8 @@ label{display:block;font-weight:600;font-size:14px;color:var(--mute)}
 .heat .pend{background:var(--pend)}
 #pop{position:fixed;z-index:50;width:max-content;max-width:min(280px,calc(100vw - 16px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.25);font-size:14px;line-height:1.4}
 .ph{font-weight:600;margin-bottom:6px}.pl{margin-top:6px}.pl:first-of-type{margin-top:0}
-.pd{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.pl.pt{border-top:1px solid var(--line);padding-top:6px;margin-top:8px}
+.pd{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;background:var(--pend)}
 .pn{white-space:pre-wrap;color:var(--mute);margin-top:4px;max-height:140px;overflow:auto;border-left:3px solid var(--line);padding-left:8px}
 .streak{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 8px;border-radius:999px;font-weight:600;font-size:14px;color:#fff;position:relative;overflow:hidden;background:linear-gradient(135deg,#b4231a,#f26a1b)}
 .meta .streak b{color:#fff;font-size:18px}
@@ -96,10 +94,10 @@ label{display:block;font-weight:600;font-size:14px;color:var(--mute)}
 @keyframes flicker{0%,100%{transform:scale(1) rotate(-3deg)}25%{transform:scale(1.14) rotate(3deg)}50%{transform:scale(.95) rotate(-1deg)}75%{transform:scale(1.1) rotate(4deg)}}
 @keyframes glow{0%,100%{box-shadow:0 0 5px rgba(245,120,20,.45)}50%{box-shadow:0 0 16px rgba(255,110,20,.95)}}
 @media (prefers-reduced-motion:reduce){.streak,.streak::after,.flame{animation:none!important}}
-.heat :is(button,.cell):not(.pend):not(.miss),.lv{background-image:linear-gradient(145deg,rgba(255,255,255,.42),rgba(255,255,255,0) 55%)}
-.heat :is(button,.cell):not(.pend):not(.miss){box-shadow:inset 0 -2px 0 rgba(0,0,0,.1),0 1px 6px rgba(0,0,0,.14)}
-.heat .miss,.pd.miss,.lgm{background:repeating-linear-gradient(135deg,rgba(165,0,38,.42) 0 4px,rgba(165,0,38,.15) 4px 8px)}
-.lgm{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle}
+.heat :is(button,.cell):not(.pend){background-image:linear-gradient(145deg,rgba(255,255,255,.42),rgba(255,255,255,0) 55%)}
+.heat :is(button,.cell):not(.pend){box-shadow:inset 0 -2px 0 rgba(0,0,0,.1),0 1px 6px rgba(0,0,0,.14)}
+.lgm,.lgr{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:middle}
+.lgm{background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}.lgr{background:var(--red)}
 .s0{background:linear-gradient(135deg,#c2410c,#e8791f)}
 .s0::after{display:none}
 .s0 .flame{filter:none;animation-duration:3s}
@@ -111,15 +109,8 @@ select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var
 .goalwrap{display:inline-flex;align-items:center;gap:6px}.goalwrap label{white-space:nowrap;font-size:14px}
 .goalwrap input{flex:none;width:90px}
 .bt{border:2px solid transparent;border-radius:10px;padding:6px 14px;font-weight:600;color:#fff}
-.bt.l5{background-color:var(--l5);color:#fff}.bt.l0{background-color:var(--l0)}
 .bt[aria-pressed="true"]{border-color:var(--ink)}.bt[aria-pressed="false"]{opacity:.7}
-.heat .miss.good,.pd.miss.good,.lgm.good{background:repeating-linear-gradient(135deg,rgba(26,152,80,.5) 0 4px,rgba(26,152,80,.18) 4px 8px)}
-.legend .gbar{display:inline-block;width:120px;height:12px;border-radius:6px;vertical-align:middle;background:linear-gradient(90deg,#A50026,#F46D43 20%,#FEE08B 40%,#A6D96A 60%,#1A9850 80%,#006837)}
-:root[data-palette="github"]{--l0:#E0334C;--l1:#B1EABC;--l2:#8CDF9E;--l3:#45C668;--l4:#2FA050;--l5:#14602E}
-:root[data-palette="github"] :is(.heat .miss,.pd.miss,.lgm){background:var(--pend)!important}
-:root[data-palette="github"] .bt.l5{color:#fff}
-:root[data-palette="github"] .legend .gbar{background:linear-gradient(90deg,#E0334C 0 12%,#D4F5DA 12%,#8FE0A0 40%,#3FC463 62%,#2E9E4F 80%,#14602E)}
-#palette{font:inherit;font-size:14px;margin-right:8px;color:var(--ink);background:var(--card);padding:4px 10px}
+.legend .gbar{display:inline-block;width:120px;height:12px;border-radius:6px;vertical-align:middle;background:linear-gradient(90deg,var(--g0),var(--g1) 50%,var(--g2))}
 :root{--skip:#94A3B8}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--skip:#64748B}}
 :root[data-theme="dark"]{--skip:#64748B}
@@ -128,13 +119,6 @@ select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var
 .legend .sksw{display:inline-block;background:var(--skip)}
 .skipbadge{display:inline-flex;align-items:center;gap:6px;background:var(--skip);color:#fff;border-radius:999px;padding:4px 12px;font-weight:600;font-size:14px}
 .skippanel{display:inline-flex;gap:8px;flex-wrap:wrap;align-items:center}.skippanel input{width:160px;flex:none}
-:root[data-palette="cool"]{--l0:#EF4466;--l1:#A941C2;--l2:#5461E4;--l3:#17A7D1;--l4:#26D492;--l5:#B8F26B}
-:root[data-palette="cool"] :is(.heat .miss,.pd.miss,.lgm){background:repeating-linear-gradient(135deg,rgba(239,68,102,.42) 0 4px,rgba(239,68,102,.15) 4px 8px)}
-:root[data-palette="cool"] :is(.heat .miss.good,.pd.miss.good,.lgm.good){background:repeating-linear-gradient(135deg,rgba(39,214,143,.5) 0 4px,rgba(39,214,143,.18) 4px 8px)}
-:root[data-palette="cool"] .bt.l5{background-color:var(--l4);color:#05341f}
-:root[data-palette="cool"] .legend .gbar{background:linear-gradient(90deg,#EF4466,#B83DBA 15%,#6C4FE0 30%,#2F7BEA 45%,#10B5C9 62%,#27D68F 80%,#B8F26B)}
-:root[data-palette="github"] .heat :is(button,.cell),:root[data-palette="github"] .lv,:root[data-palette="github"] .bt{background-image:none!important;box-shadow:none!important}
-:root[data-palette="github"] .heat>*{border-radius:3px}
 
 #sync{font-size:13px;color:var(--mute)}
 .heat [data-pk]:focus-visible{outline:2px solid var(--ink);outline-offset:2px;position:relative;z-index:1}
@@ -149,7 +133,7 @@ select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var
 .heat-sm{grid-template-rows:auto;grid-auto-columns:minmax(0,1fr);gap:2px;justify-content:stretch}
 .heat-sm>*{aspect-ratio:auto;height:12px;border-radius:3px}
 .heat-sm .now{outline-width:1px;outline-offset:0}
-.heat-sm :is(button,.cell):not(.pend):not(.miss){box-shadow:none}
+.heat-sm :is(button,.cell):not(.pend):not(.gl){box-shadow:none}
 @media (max-width:520px){.heat-lg{gap:3px}}
 .homelink{color:inherit;text-decoration:none}
 .homelink:hover{text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:2px}
@@ -194,7 +178,7 @@ a.rm{display:inline-block}
 #page>section{margin-bottom:14px}
 a.nm{color:inherit}
 .blk .log input{width:72px}
-@media (max-width:520px){.blk .lv{width:26px;height:26px}.blk .log{gap:5px}}
+@media (max-width:520px){.blk .lv{height:26px;padding:0 6px}.blk .log{gap:5px}}
 
 /* ---- Part 6: manage categories, archive ---- */
 .sech-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:22px 0 10px}.sech-row .sech{margin:0}
@@ -222,9 +206,9 @@ button,select,label.ck,input[type=checkbox],input[type=color]{touch-action:manip
 /* notches and rounded corners in landscape */
 main{padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
 @media (max-width:520px){main{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}}
-/* theme + palette controls: wrap instead of overlapping the title on narrow screens */
+/* theme control: wraps instead of overlapping the title on narrow screens */
 .tools{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-bottom:6px}
-.themebtn{float:none}#palette{margin-right:0;max-width:100%}
+.themebtn{float:none}
 .chip{min-height:36px}
 h2[tabindex="-1"]:focus,.dname:focus{outline:none}   /* headings are focused only so screen readers announce the new page */
 /* text contrast (WCAG AA, 4.5:1) */
@@ -238,15 +222,12 @@ h2[tabindex="-1"]:focus,.dname:focus{outline:none}   /* headings are focused onl
 .s2{background:linear-gradient(135deg,#9d1420,#b83a12 55%,#c8301a)}
 .s3{background:linear-gradient(135deg,#7f0f1f,#b8250f 50%,#bf3a0b)}
 .s4{background:linear-gradient(135deg,#6b0a22,#b3201f 45%,#b8430a)}
-.bt.l5{color:var(--on-l5,#fff)}   /* the dark-mode green is too light for white text */
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-l5:#000}}
-:root[data-theme="dark"]{--on-l5:#000}
 .bt[aria-pressed="false"]{opacity:.9}
 /* Touch screens: 44px targets, and 16px fields so iOS does not zoom the page when you tap one */
 @media (pointer:coarse){
   input,select,textarea{font-size:16px}
   .btn,.sv,.bt,.chip,select,.mbtns .sv,.mrow .sv{min-height:44px}
-  .lv,.blk .lv{width:40px;height:40px}
+  .lv,.blk .lv{min-height:40px;height:auto;padding:0 10px}
   .log{gap:8px}
   .rm{display:inline-block;padding:12px 6px;margin:-12px -6px}
   .nt{padding:14px 0}
@@ -258,3 +239,190 @@ h2[tabindex="-1"]:focus,.dname:focus{outline:none}   /* headings are focused onl
   .heat>*,.lv,.bt,.catbtn,.streak,.skipbadge{forced-color-adjust:none}
   .heat button,.heat .cell,.lv{border:1px solid CanvasText}
 }
+
+/* ---- Green scale: 0% red, above 0 pale green -> good green at 100% -> deep green at 200%, glow above 200% ---- */
+.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}
+.heat>.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}
+.gc.gz,.heat>.gc.gz{background-color:var(--red)}
+.bt{color:var(--on-g,#fff)}.bt.gz{color:#fff}
+.bt.gc{border-color:transparent}.bt.gc[aria-pressed="true"]{border-color:var(--ink)}
+/* the live square next to the amount box: shows the colour the day's square will get */
+.sim{flex:none;width:28px;height:28px;border-radius:8px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}
+.sim.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}.sim.gc.gz{background-color:var(--red)}
+.sim.gc:not(.gl){box-shadow:none}
+@media (pointer:coarse){.sim{width:36px;height:36px}}
+/* glow: grows with the value above 200% (--w = 0..1) */
+.gc.gl,.heat :is(button,.cell).gl{box-shadow:0 0 calc(3px + var(--w,0)*9px) calc(var(--w,0)*2px) color-mix(in srgb,var(--glow) calc(35% + var(--w,0)*55%),transparent)}
+.heat-sm :is(button,.cell).gl{box-shadow:0 0 calc(1px + var(--w,0)*3px) color-mix(in srgb,var(--glow) calc(35% + var(--w,0)*55%),transparent)}
+/* shimmer: a slow light sweep, only for really big days (500%+) */
+.gs{position:relative;overflow:hidden}
+.gs::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);transform:translateX(-130%);animation:shine 3.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.gs::before{animation:none;display:none}}
+@media (forced-colors:active){.sim,.lv i,.pd{border:1px solid CanvasText}}
+
+/* "What did you do?" (one short line per day) and several notes per day */
+#sum{display:block;width:100%;flex:none;margin:4px 0 16px}
+.noteshead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 8px}
+.noteshead .lbl{font-weight:600;font-size:14px;color:var(--mute)}
+.ntbtns{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto}
+.ntbtns .btn[disabled]{opacity:.4;cursor:default}
+.ntrows{list-style:none;margin:0;padding:0}
+.ntrow{margin:0 0 4px}
+.nthead{display:flex;align-items:center;gap:8px}
+.nthead label{margin:0}
+.ntat{font-size:12px;color:var(--mute)}   /* the quiet "added at" time */
+.ntrow textarea{margin:4px 0 10px}
+.nt span{display:block}.nt span+span{margin-top:4px}   /* each note of a day on its own line in "All notes" */
+.nt .ntsum{color:var(--ink);font-weight:600}
+.ps{margin-top:4px;font-weight:600}   /* summary line right under the amount, in the day popover */
+.sumline{font-size:14px;color:var(--ink)}.sumlbl{color:var(--mute)}
+
+/* ---- Day page (#/d/<yyyy-mm-dd>): all habits of one day ---- */
+a.btn{display:inline-block;text-decoration:none}
+.btn.dis{opacity:.4;cursor:default}
+.daynav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 14px}
+.daynav input[type=date]{flex:none}
+.dbadge{display:inline-block;padding:1px 10px;border-radius:999px;background:var(--pend);color:var(--ink);font-size:13px;font-weight:600;vertical-align:middle}
+.dnow{background:var(--ink);color:var(--bg)}
+.dsw{flex:none;display:block;width:34px;height:34px;border-radius:9px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}
+.dsw.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}.dsw.gc.gz{background-color:var(--red)}
+.dsw.gc:not(.gl){box-shadow:none}
+.dsw.dsk{background:var(--skip);box-shadow:none}
+.dtotal{display:flex;align-items:center;gap:16px}
+.dtotal .dsw{width:64px;height:64px;border-radius:16px}
+.dtbig{display:block;font-size:40px;line-height:1.1;font-weight:800}
+.dtsub{color:var(--mute);font-size:14px}
+.dgrp{border-left:6px solid var(--c)}
+.dgh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-bottom:6px}
+.dgh h3{display:flex;align-items:center;gap:10px;margin:0;font-size:18px;font-weight:800;min-width:0;overflow-wrap:anywhere}
+.dgs{color:var(--mute);font-size:14px}
+.dcard{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.dcard:first-child{border-top:0}
+.dmain{flex:1;min-width:0}
+.dtop{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.dpct{font-size:22px;font-weight:800}.dnone{color:var(--mute)}
+.dstat{font-size:14px}.dcard.none .dstat,.dimp{color:var(--mute)}
+.dsum{margin-top:6px;font-weight:600}
+.dnotes{list-style:none;margin:6px 0 0;padding:0}
+.dnotes li{white-space:pre-wrap;color:var(--mute);margin-top:4px;border-left:3px solid var(--line);padding-left:8px;overflow-wrap:anywhere}
+.dact{margin-top:6px}
+.pact{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+@media (forced-colors:active){.dsw{border:1px solid CanvasText;forced-color-adjust:none}}
+@media (max-width:520px){.dtbig{font-size:32px}.dtotal .dsw{width:52px;height:52px}.dpct{font-size:19px}}
+
+/* Category page: habit blocks one per row, so each habit's heatmap has the normal (large) size */
+@media (min-width:760px){.blocks{grid-template-columns:1fr}}
+
+/* ---- Freeze: ice colour (light blue), different from the grey of skipped days ---- */
+:root{--ice:#BFE3F5;--icex:#2F7AA8;--icetx:#14405C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ice:#2C5F7F;--icex:#D6EEFF;--icetx:#D6EEFF}}
+:root[data-theme="dark"]{--ice:#2C5F7F;--icex:#D6EEFF;--icetx:#D6EEFF}
+/* heatmap cell: ice square with a snowflake inside. The cell is a size container, so the flake scales with the square (cqw); the font-size before it is the fallback */
+.heat :is(button,.cell).frz{background-color:var(--ice);position:relative;container-type:inline-size;overflow:hidden}
+.heat :is(button,.cell).frz::before{content:"❄";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--icex);pointer-events:none;
+  font-size:10px;font-size:min(72cqw,var(--frzmax,24px))}
+.heat-sm{--frzmax:10px}
+.legend .icsw{display:inline-block;background:var(--ice);box-shadow:inset 0 0 0 1px var(--icex)}
+.frzbadge{display:inline-flex;align-items:center;gap:6px;background:var(--ice);color:var(--icetx);border-radius:999px;padding:4px 12px;font-weight:600;font-size:14px}
+.dsw.dic{background:var(--ice);box-shadow:inset 0 0 0 1px var(--icex)}
+.dbadge.dfz{background:var(--ice);color:var(--icetx)}
+.frzbanner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;padding:10px 14px;border-radius:10px;background:var(--ice);color:var(--icetx);font-size:14px;font-weight:600}
+.blk-btns{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px}
+@media (forced-colors:active){.frzbadge,.frzbanner{forced-color-adjust:none}}
+
+/* ---- Totals and date-range stats (Category and Habit pages) ---- */
+.stats .strh{margin-top:20px}
+.stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0}
+.stc{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.stc dt{color:var(--mute);font-size:13px;line-height:1.3}
+.stc dd{margin:2px 0 0;font-size:22px;line-height:1.2;font-weight:800;overflow-wrap:anywhere}
+.stc.wide{grid-column:1/-1}.stc.wide dd{font-size:18px}
+.stc.ice{background:var(--ice);border-color:transparent;color:var(--icetx)}.stc.ice dt{color:var(--icetx)}
+.rl{display:flex;align-items:center;gap:8px;color:var(--mute)}
+.rl input[type=date]{flex:none}
+.strange{margin-top:6px}.strange .hint{margin:6px 0}
+@media (max-width:520px){.stgrid{grid-template-columns:repeat(2,1fr)}.stc dd{font-size:19px}.stc.wide dd{font-size:16px}}
+@media (forced-colors:active){.stc{border:1px solid CanvasText}.stc.ice{forced-color-adjust:none}}
+
+/* ---- Habit blocks on the Category page: all the same size, in the category colour, with a drag handle ---- */
+/* one block per row; grid-auto-rows:1fr makes every row as tall as the tallest block, so all blocks have the same height and width */
+.blocks{grid-auto-rows:1fr;align-items:stretch;gap:14px}
+.blk{width:100%;gap:10px;border-left:6px solid var(--c,var(--line))}
+.blk-h{align-items:center;gap:6px}
+.blk-h .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.blk-btns{flex:none}
+.blk-info{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;color:var(--mute);font-size:14px}
+.kchip{display:inline-block;padding:1px 10px;border-radius:999px;border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap}
+.kchip.stop{border-color:var(--c,var(--ink))}
+.kchip.ice{background:var(--ice);border-color:transparent;color:var(--icetx)}
+/* optional lines: one line each (cut with ...), and an invisible twin in blocks that have none, so every block keeps the same layout */
+.blk .line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1.5em;font-size:14px}
+.blk .line.ph{visibility:hidden}
+/* the quick log keeps its place; the heatmap always sits at the bottom of the block */
+.blk>.scroll{margin-top:auto}
+.blk .heat .pre{box-shadow:inset 0 0 0 1px var(--line);opacity:.5}
+/* a frozen habit shows this strip where the quick log would be */
+.blk .logrow.frzslot{flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:10px 14px;border-radius:10px;background:var(--ice);color:var(--icetx);font-weight:600}
+.frzslot .frzbadge{background:none;padding:0}
+.frzslot .frzmsg{flex:1 1 160px;font-weight:400}
+/* text habit: the text box takes the first line, the percentage and its colour square follow */
+.log.txtlog{display:flex;width:100%}
+.blk .log input.txtin{flex:1 1 220px;width:auto;min-width:0;padding:6px 10px}
+.blk .log.txtlog input[type=number]{width:84px}
+
+/* drag handle */
+.drag{flex:none;display:inline-grid;place-items:center;width:28px;height:36px;margin-left:-8px;padding:0;border:0;border-radius:8px;background:none;color:var(--mute);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.drag svg{fill:currentColor;pointer-events:none}
+.drag:hover{background:var(--pend);color:var(--ink)}
+.drag:active{cursor:grabbing}
+@media (pointer:coarse){.drag{width:44px;height:44px;margin-left:-12px}}
+.blocks.sorting{-webkit-user-select:none;user-select:none;cursor:grabbing}
+.blk.dragging{position:relative;z-index:5;box-shadow:0 14px 34px rgba(0,0,0,.3);border-color:var(--c,var(--ink));transition:none}
+@media (prefers-reduced-motion:no-preference){.blocks.sorting .blk:not(.dragging){transition:transform .18s ease}}
+
+/* add form */
+#add #unit{flex:1 1 200px}
+
+/* ---- Groups (wird) inside a category: a card with the same parts as the category page, in the category colour ---- */
+.grp{border-left:6px solid var(--c);padding-left:14px;margin:26px 0 8px}
+.grph{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:12px}
+.grpt{margin:0;font-size:22px;font-weight:800;min-width:0;flex:1 1 auto}
+.grptog{display:inline-flex;align-items:center;gap:10px;background:none;border:0;padding:6px 0;font:inherit;font-weight:800;color:var(--ink);text-align:left;overflow-wrap:anywhere}
+.grptog span{color:var(--c)}
+.grps{color:var(--mute);font-size:14px}
+.grp .blocks{margin-top:14px}
+.grpedit{margin-top:6px}
+.grows{list-style:none;margin:6px 0;padding:0}
+.grow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0}
+.grow .mname{flex:1 1 160px}
+.addgrp{margin:8px 0 0;flex-wrap:wrap;align-items:center}
+.addgrp input{flex:1 1 180px}
+#add #grp{flex:0 1 auto}
+@media (max-width:520px){.grpt{font-size:19px}}
+
+/* ---- Periodic habits (habits you do not do every day) ---- */
+/* the three-way switch above a combined heatmap */
+.hmode{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.hmode .hmb[aria-pressed="true"]{border-color:var(--ink);background:var(--pend);font-weight:600}
+/* a checked periodic habit: a small marker in the corner of a combined cell (no number) */
+.heat .pc{position:relative}
+.pmk{position:absolute;left:2px;top:2px;width:5px;height:5px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 1px var(--card);pointer-events:none}
+.heat-sm .pmk{width:3px;height:3px;left:1px;top:1px}
+/* a day when ONLY periodic habits were checked: an outlined neutral cell (not empty, not coloured) */
+.heat :is(button,.cell).pon{background-color:transparent;background-image:none;box-shadow:inset 0 0 0 2px var(--mute)}
+.heat-sm :is(button,.cell).pon{box-shadow:inset 0 0 0 1px var(--mute)}
+/* "Periods only": the number of habits checked, written on the cell (large and medium maps only) */
+.heat button.pc,.heat .cell.pc{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pcn{font-size:11px;font-weight:700;line-height:1;color:var(--ink);text-shadow:0 0 3px var(--card),0 0 3px var(--card);pointer-events:none}
+.heat-md .pcn{font-size:9px}
+@media (max-width:520px){.heat-lg .pcn{font-size:9px}.heat-md .pcn{font-size:8px}}
+/* legend swatches */
+.legend .pmsw{position:relative;display:inline-block;background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}
+.legend .posw{display:inline-block;background:transparent;box-shadow:inset 0 0 0 2px var(--mute)}
+/* the frequency chip, the Day page badge, the add form */
+.kchip.per{border-style:dashed;border-color:var(--c,var(--ink))}
+.dbadge.dper{margin-left:8px;font-size:12px}
+#fqWrap{flex-wrap:wrap}#fqBox,#newFqBox{display:inline-flex;align-items:center;gap:6px}
+#newFqN{width:80px}
+.fqprev{flex:1 1 100%;margin:0}
+@media (forced-colors:active){.pmk{forced-color-adjust:none;background:CanvasText}.heat .pon{forced-color-adjust:none;border:2px solid CanvasText}}

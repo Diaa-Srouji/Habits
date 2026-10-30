@@ -16,8 +16,8 @@ import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmai
 import {getFirestore,doc,collection,setDoc,updateDoc,deleteDoc,deleteField,FieldPath,onSnapshot,getDocFromServer,writeBatch,runTransaction} from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 import {firebaseConfig} from './firebase-config.js';
 import {S,resetState} from './state.js';
-import {loadCats} from './categories.js';
-import {HABIT_MAPS as HM,CATS_MAPS as CM,clone,same,toHabit,sortHabits,diff,apply,rebase,catsToDoc,docToCats,normCats,planMigration} from './docs.js';
+import {loadCats,loadGrps} from './categories.js';
+import {HABIT_MAPS as HM,CATS_MAPS as CM,clone,same,toHabit,sortHabits,diff,apply,rebase,catsToDoc,docToCats,docToGrps,normCats,planMigration} from './docs.js';
 
 const OLD='habit-tracker-v2',NEW='habit-tracker-v3',SIZE_WARN=800000,BATCH=400;   // Firestore: 1 MB per document, 500 writes per batch
 const fbApp=initializeApp(firebaseConfig),auth=getAuth(fbApp),db=getFirestore(fbApp);
@@ -37,7 +37,7 @@ const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const nk=n=>NEW+':'+uid+':'+n;
 const lsJSON=(k,d)=>{try{const v=JSON.parse(lsGet(k));return v==null?d:v}catch(e){return d}};
-function cache(){lsSet(nk('habits'),JSON.stringify(S.habits));lsSet(nk('cats'),JSON.stringify(S.cats));
+function cache(){lsSet(nk('habits'),JSON.stringify(S.habits));lsSet(nk('cats'),JSON.stringify(S.cats));lsSet(nk('grps'),JSON.stringify(S.grps));
   lsSet(nk('base'),JSON.stringify([...base]));lsSet(nk('catsbase'),JSON.stringify(catsBase))}
 const doneMsg=()=>big?'Saved to cloud · data is getting large, export a backup':'Saved to cloud ✓';
 const online=()=>navigator.onLine!==false;
@@ -60,7 +60,7 @@ function planJobs(){const jobs=[],have=new Set();
     if(!b)jobs.push({type:'create',id:d.id,doc:d});
     else{const ops=diff(b,h,HM);if(ops.length)jobs.push({type:'update',id:d.id,ops})}}
   for(const id of base.keys())if(!have.has(id))jobs.push({type:'delete',id});
-  if(catsBase){const ops=diff(catsBase,catsToDoc(S.cats),CM);if(ops.length)jobs.push({type:'cats',ops})}
+  if(catsBase){const ops=diff(catsBase,catsToDoc(S.cats,S.grps),CM);if(ops.length)jobs.push({type:'cats',ops})}
   return jobs}
 const toArgs=ops=>ops.flatMap(o=>[new FieldPath(...o.path),o.del?deleteField():o.value]);
 
@@ -135,8 +135,8 @@ function onCats(snap){
   if(!snap.exists()){                                              // not moved yet (or brand-new account)
     if(!snap.metadata.fromCache&&!ready){needMove=true;moveData()}
     return}
-  const R=normCats(snap.data()),mine=catsToDoc(S.cats),pend=catsBase?diff(catsBase,mine,CM):[],next=docToCats(apply(R,pend,CM));
-  const changed=!same(next,S.cats);S.cats=next;catsBase=R;
+  const R=normCats(snap.data()),mine=catsToDoc(S.cats,S.grps),pend=catsBase?diff(catsBase,mine,CM):[],merged=apply(R,pend,CM),next=docToCats(merged),nextG=docToGrps(merged,next);
+  const changed=!same(next,S.cats)||!same(nextG,S.grps);S.cats=next;S.grps=nextG;catsBase=R;
   const first=!ready;ready=true;needMove=false;
   if(first)recoverOld().finally(()=>{after(changed,true);if(planJobs().length)flush();else settle()});
   else after(changed,!snap.metadata.fromCache);
@@ -210,8 +210,9 @@ export function watchAuth({onOut,onIn,onRemote}){
     // This browser's copy. If its "confirmed" half is missing or damaged, trust the cloud instead of risking an overwrite.
     const lh=lsJSON(nk('habits'),[]),lb=lsJSON(nk('base'),null);
     if(Array.isArray(lh)&&Array.isArray(lb)&&lb.every(p=>Array.isArray(p)&&typeof p[0]==='string')){
-      S.habits=sortHabits(lh.map(h=>toHabit(h)).filter(Boolean));base=new Map(lb);catsBase=lsJSON(nk('catsbase'),null);S.cats=loadCats(lsGet(nk('cats')))}
-    else{S.habits=[];S.cats=loadCats(null)}
+      S.habits=sortHabits(lh.map(h=>toHabit(h)).filter(Boolean));base=new Map(lb);catsBase=lsJSON(nk('catsbase'),null);S.cats=loadCats(lsGet(nk('cats')));S.grps=loadGrps(lsGet(nk('grps')),S.cats);
+      if(lsGet(nk('grps'))===null&&catsBase&&catsBase.grps&&Object.keys(catsBase.grps).length)catsBase=null}   // groups known to the cloud but missing here: trust the cloud, never delete them
+    else{S.habits=[];S.cats=loadCats(null);S.grps=[]}
     onIn(u);
     setSync(online()?'Syncing…':'Offline · showing the copy saved on this device');
     const fail=e=>{console.error('Cloud sync failed',e);

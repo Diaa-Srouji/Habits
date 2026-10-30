@@ -32,3 +32,30 @@ export const newCatId=()=>'c'+Date.now().toString(36);
 export const renumber=cats=>cats.map((c,i)=>({...c,order:i}));
 export function moveCat(cats,id,dir){const i=cats.findIndex(c=>c.id===id),j=i+dir;
   if(i<0||j<0||j>=cats.length)return cats;const a=cats.slice();[a[i],a[j]]=[a[j],a[i]];return renumber(a)}
+
+// ---- Groups (a "wird": several habits grouped inside ONE category) ----
+// S.grps = [{id,cat,name,order}]. A habit joins a group with h.grp = the group id (its h.cat stays the category).
+// order = the place of the group among the groups of its own category (0..n-1).
+export function cleanGroup(g,i=0){
+  if(!g||typeof g!=='object'||typeof g.id!=='string'||!ID.test(g.id)||typeof g.cat!=='string'||!ID.test(g.cat)||typeof g.name!=='string'||!g.name.trim())return null;
+  return {id:g.id,cat:g.cat,name:g.name.trim().slice(0,40),order:Number.isFinite(+g.order)?+g.order:i}}
+export function renumberGrps(grps){const n={};
+  return grps.map((g,i)=>[g,i]).sort((a,b)=>a[0].order-b[0].order||a[1]-b[1]).map(([g])=>({...g,order:n[g.cat]=(n[g.cat]===undefined?0:n[g.cat]+1)}))}
+// Valid groups only: no duplicate ids, and (when the categories are given) only groups of a category that exists
+export function cleanGrps(arr,cats){const seen=new Set();
+  return renumberGrps((Array.isArray(arr)?arr:[]).map(cleanGroup).filter(g=>g&&!seen.has(g.id)&&seen.add(g.id)&&(!cats||cats.some(c=>c.id===g.cat))))}
+// raw = JSON text saved in the browser (or null)
+export function loadGrps(raw,cats){let a=null;try{a=JSON.parse(raw)}catch(e){}return cleanGrps(a,cats)}
+// Imported groups replace same-id ones
+export function mergeGrps(cur,imp,cats){const m=new Map(cur.map(g=>[g.id,g]));imp.forEach(g=>m.set(g.id,g));return cleanGrps([...m.values()],cats)}
+export const groupsOf=(grps,cat)=>grps.filter(g=>g.cat===cat).sort((a,b)=>a.order-b.order);
+// The habits of a group, and the habits of a category that are in no group (a habit with a missing group counts as "in no group")
+export const inGroup=(habits,g)=>habits.filter(h=>h.cat===g.cat&&h.grp===g.id&&!h.archived);
+export const loose=(habits,cat,grps)=>habits.filter(h=>h.cat===cat&&!h.archived&&!grps.some(g=>g.cat===cat&&g.id===h.grp));
+export const newGrpId=()=>'g'+Date.now().toString(36);
+// Move a group up (-1) or down (+1) among the groups of its own category
+export function moveGrp(grps,id,dir){const g=grps.find(x=>x.id===id);if(!g)return grps;
+  const ids=groupsOf(grps,g.cat).map(x=>x.id),i=ids.indexOf(id),j=i+dir;
+  if(j<0||j>=ids.length)return grps;
+  [ids[i],ids[j]]=[ids[j],ids[i]];
+  return renumberGrps(grps.map(x=>x.cat===g.cat?{...x,order:ids.indexOf(x.id)}:x))}
