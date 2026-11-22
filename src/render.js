@@ -1,7 +1,8 @@
 // Turns state into HTML: picks the page from the address (Home, Category, Habit, Day, Edit habits) and builds the views.
 import {S} from './state.js';
 import {$,K,T,esc,fmt,pct} from './util.js';
-import {isOff,isFrozen,isFrozenNow,freezeState,extendFreeze,streak,best,count,span,todayOf,typeLabel,periods,norm,SHORT,shortAmt,pctOf,pctText,amtPct,paint,imp,goalOn,goalVal,goalHistory,needsGoalLog,sumOf,dayNotes,isManual,pruneEmpty,textDays,sortByOrder,isPeriodic,freqText,daily,periodic,cleanFreq,fmtHHMM} from './scoring.js';
+import {isOff,isFrozen,isFrozenNow,freezeState,extendFreeze,streak,best,count,span,todayOf,typeLabel,periods,norm,SHORT,shortAmt,pctOf,pctText,amtPct,paint,imp,goalOn,goalVal,goalHistory,needsGoalLog,sumOf,dayNotes,isManual,pruneEmpty,textDays,sortByOrder,isPeriodic,freqText,daily,periodic,cleanFreq,fmtHHMM,reqHistory,reqOn,reqText,reqStreaks} from './scoring.js';
+import {exportCodeDB} from './codedb.js';
 import {heatmap,legendHTML,hidePop,rove,modeSwitch} from './heatmap.js';
 import {live,unassigned,inCat,inGroup,inGroupDeep,loose,childGroups,groupTreeList,groupPath,nextColor} from './categories.js';
 import {parseHash,href} from './router.js';
@@ -117,7 +118,7 @@ export function setRangePreset(key,preset){
 export function statsSection(sc,id,hs){
   const key=sc+':'+id,today=K(T()),targetHs=sc==='a'?selectedHomeHabits():hs;
   const {mode,from,to}=rangeOf(key,targetHs.length?targetHs:hs);
-  const tid='stT-'+esc(id),foldKey='st:'+key,folded=isFolded(foldKey,false);
+  const tid='stT-'+esc(id),foldKey='st:'+key,folded=isFolded(foldKey,true);
   const allLive=sc==='a'?live(S.habits):[];
   const allPicked=!S.statPick;
   const picker=sc==='a'?`<div class="stpick">
@@ -134,7 +135,7 @@ export function statsSection(sc,id,hs){
 
   return `<section class="stats" aria-labelledby="${tid}">
     <div class="sec-hd">
-      <h2 id="${tid}"><button type="button" class="ftog" data-fold="${foldKey}" aria-expanded="${!folded}"><span>${folded?'▸':'▾'}</span> Statistics</button></h2>
+      <h2 id="${tid}"><button type="button" class="ftog" data-fold="${foldKey}" aria-expanded="${!folded}"><span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span> Statistics</button></h2>
       ${folded?`<span class="hint" style="margin:0">${mode==='all'?'All time':mode==='month'?'Last month':esc(from)+' → '+esc(to)}</span>`:''}
     </div>
     ${folded?'':`<div class="stbar">
@@ -159,18 +160,28 @@ const gripIcon='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="tru
 
 function habitBlock(h,P,o){
   const k=K(P.t),sm=sumOf(h,k),ph='<div class="line ph" aria-hidden="true">&nbsp;</div>';
-  const folded=isFolded('blk:'+h.id,false);
+  const folded=isFolded('blk:'+h.id,true);
   const slot=`<div class="logrow">Today ${logHTML(h,k)}</div>`;
   const desc=o.desc?(h.desc?`<div class="line desc" title="${esc(h.desc)}">${esc(h.desc)}</div>`:ph):'';
   const sum=o.sum?(h.type!=='text'&&sm?`<div class="line sumline" title="${esc(sm)}"><span class="sumlbl">What you did:</span> ${esc(sm)}</div>`:ph):'';
+  let mini='';
+  if(folded){
+    const off=isOff(h,k),lg=!off&&(h.done[k]>0||!!(h.skip||{})[k]);
+    if(isFrozen(h,k))mini='<span class="blk-mini"><i class="pd" style="background:var(--ice)"></i>Frozen</span>';
+    else if(off)mini='<span class="blk-mini"><i class="pd" style="background:var(--skip)"></i>Skipped</span>';
+    else if(lg){const v=h.done[k]||0,p=pctOf(h,v,k),g=paint(p,true);
+      mini=`<span class="blk-mini"><i class="pd ${g.cls}"${g.style?` style="${g.style}"`:''}></i>${pctText(p)}</span>`}
+    else mini='<span class="blk-mini"><i class="pd"></i>Not logged</span>';
+  }
   return `<article class="blk${folded?' folded':''}" data-id="${h.id}">
     <div class="blk-h">
       <button class="drag" type="button" data-drag="${h.id}" title="Drag to change the order" aria-label="Move ${esc(h.name)}.">${gripIcon}</button>
-      <button type="button" class="ftog" data-fold="blk:${h.id}" aria-expanded="${!folded}" aria-label="${folded?'Expand':'Fold'} ${esc(h.name)}"><span>${folded?'▸':'▾'}</span></button>
+      <button type="button" class="ftog icon-only" data-fold="blk:${h.id}" aria-expanded="${!folded}" aria-label="${folded?'Expand':'Fold'} ${esc(h.name)}"><span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span></button>
       <a class="name nm" href="${href.habit(h.id)}">${esc(h.name)}</a>
+      ${mini}
       <span class="blk-btns"><button class="rm" data-archive="${h.id}" title="Hide this habit but keep its history">Archive</button></span>
     </div>
-    ${folded?'':`<div class="blk-info">${streakHTML(h)}<span class="kchip${h.stop?' stop':''}">${kindName(h)} · ${h.stop?'stop':'do it'}</span>${isPeriodic(h)?`<span class="kchip per" title="How often (only a label)">${esc(freqText(h))}</span>`:''}<span class="goal">${goalText(h)}</span></div>
+    ${folded?'':`<div class="blk-info">${streakHTML(h)}<span class="kchip${h.stop?' stop':''}">${kindName(h)} · ${h.stop?'stop':'do it'}</span>${isPeriodic(h)?`<span class="kchip per" title="How often (only a label)">${esc(freqText(h))}</span>`:''}${reqBadgeHTML(h)}<span class="goal">${goalText(h)}</span></div>
     ${desc}${sum}
     ${slot}
     ${heatmap({habits:[h],one:h,size:'large',full:true})}`}
@@ -191,10 +202,10 @@ function groupCard(g,c,P,depth=0){
   const directActive=sortByOrder(inGroup(S.habits,g)).filter(h=>!isFrozenNow(h));
   const subs=childGroups(S.grps,c.id,g.id);
   const open=!(S.shut&&S.shut[g.id]),t=todayOf(deep);
-  const hmFold=isFolded('ghm:'+g.id,false);
+  const hmFold=isFolded('ghm:'+g.id,true);
   const body=open?`<div id="gb-${g.id}">
     <section aria-label="${esc(g.name)} progress">${progressHTML(deep,c.color,P)}
-      ${deep.length?`<div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="ghm:${g.id}" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> Heatmap · 20 weeks</button></h2></div>${hmFold?'':`${modeSwitch(deep,'heatG-'+g.id)}${heatmap({habits:deep,size:'large',id:'heatG-'+g.id,scope:'g:'+g.id})}${legendHTML(periodic(deep).length>0)}`}`:''}</section>
+      ${deep.length?`<div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="ghm:${g.id}" aria-expanded="${!hmFold}"><span class="farr" aria-hidden="true">${hmFold?'▸':'▾'}</span> Heatmap · 20 weeks</button></h2></div>${hmFold?'':`${modeSwitch(deep,'heatG-'+g.id)}${heatmap({habits:deep,size:'large',id:'heatG-'+g.id,scope:'g:'+g.id})}${legendHTML(periodic(deep).length>0)}`}`:''}</section>
     ${directActive.length?blocksHTML(directActive,P,c.color):''}
     ${subs.map(sg=>groupCard(sg,c,P,depth+1)).join('')}
     ${deep.length||subs.length?'':'<section><p class="empty">No active habits in this group. Add or unfreeze habits in <a href="'+href.manage+'">Edit habits</a>.</p></section>'}
@@ -211,7 +222,7 @@ function renderCategory(c){
   $('page').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span><span aria-current="page">${esc(c.name)}</span></nav>
   <div class="sec-hd"><h2 class="dname cat-title" style="--c:${c.color}"><span class="cb-icon" aria-hidden="true">${esc(c.icon||'●')}</span>${esc(c.name)}</h2><a class="mlink" href="${href.manage}">Edit habits</a></div>
   <section aria-label="${esc(c.name)} progress">${progressHTML(hs,c.color,P)}
-    <div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="chm:${c.id}" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> Heatmap · 20 weeks</button></h2></div>
+    <div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="chm:${c.id}" aria-expanded="${!hmFold}"><span class="farr" aria-hidden="true">${hmFold?'▸':'▾'}</span> Heatmap · 20 weeks</button></h2></div>
     ${hmFold?'':`${modeSwitch(hs,'heatC')}${heatmap({habits:hs,size:'large',id:'heatC',scope:'c:'+c.id})}${legendHTML(periodic(hs).length>0)}`}</section>
   ${ownActive.length?blocksHTML(ownActive,P,c.color):''}
   ${topGs.map(g=>groupCard(g,c,P,0)).join('')}
@@ -219,44 +230,7 @@ function renderCategory(c){
   ${hs.length?statsSection('c',c.id,hs):''}`;
 }
 
-// ---- Edit habits page (#/manage): ONLY place to add habits, categories, nested groups, and Freeze / Unfreeze / Archive ----
-function grpTreeRows(c,parentId=null,depth=0){
-  const sibs=childGroups(S.grps,c.id,parentId);
-  return sibs.map((g,i)=>`<li class="grow" style="padding-left:${depth*20}px">
-    ${depth?'<span class="gbranch" aria-hidden="true">↳</span>':''}
-    <input class="mname" data-gname="${g.id}" value="${esc(g.name)}" maxlength="40" aria-label="Name of group">
-    <span class="mbtns">
-      <button class="btn alt sv" data-grpup="${g.id}" ${i===0?'disabled':''} aria-label="Move ${esc(g.name)} up">↑</button>
-      <button class="btn alt sv" data-grpdown="${g.id}" ${i===sibs.length-1?'disabled':''} aria-label="Move ${esc(g.name)} down">↓</button>
-      <button class="rm" data-grpdel="${g.id}">Delete</button>
-    </span></li>${grpTreeRows(c,g.id,depth+1)}`).join('');
-}
-
-function grpEditor(c){
-  const tree=groupTreeList(S.grps,c.id);
-  return `<div class="grpedit"><span class="lbl">Groups inside ${esc(c.name)} (supports nested sub-groups)</span>
-    ${tree.length?`<ul class="grows">${grpTreeRows(c,null,0)}</ul>`:'<p class="hint">No groups yet. Example: add “Wird” inside Deen, then add sub-groups inside Wird.</p>'}
-    <form class="addgrp" data-gcat="${c.id}">
-      <input name="gname" maxlength="40" placeholder="New group, e.g. Wird" aria-label="New group name in ${esc(c.name)}" required>
-      ${tree.length?`<select name="parent" aria-label="Parent group (optional)"><option value="">Top level in ${esc(c.name)}</option>${tree.map(({g,depth})=>`<option value="${g.id}">Inside: ${'— '.repeat(depth)+esc(g.name)}</option>`).join('')}</select>`:''}
-      <button class="btn alt sv">Add group</button>
-    </form></div>`}
-
-function catRow(c,i,n){
-  const all=S.habits.filter(h=>h.cat===c.id),arch=all.filter(h=>h.archived).length,others=S.cats.filter(x=>x.id!==c.id);
-  let panel='';
-  if(S.delCat===c.id){
-    if(!others.length)panel=`<div class="delpanel" role="alert">You need at least one category. <button class="btn alt sv" data-catdelcancel="1">OK</button></div>`;
-    else if(!all.length)panel=`<div class="delpanel" role="alert">Delete “${esc(c.name)}”? <button class="btn sv" data-catdelgo="${c.id}">Delete category</button><button class="btn alt sv" data-catdelcancel="1">Cancel</button></div>`;
-    else panel=`<div class="delpanel" role="alert"><span>“${esc(c.name)}” has ${all.length} habit${all.length===1?'':'s'}${arch?` (${arch} archived)`:''}. Move them to</span>
-      <select id="delTarget" aria-label="Move habits to">${others.map(o=>`<option value="${o.id}">${esc((o.icon?o.icon+' ':'')+o.name)}</option>`).join('')}</select>
-      <button class="btn sv" data-catdelgo="${c.id}">Move habits and delete</button><button class="btn alt sv" data-catdelcancel="1">Cancel</button></div>`}
-  return `<li class="mrow" style="--c:${c.color}">
-    <div class="mline"><input type="color" class="mcolor" data-ccolor="${c.id}" value="${c.color}" aria-label="Colour for ${esc(c.name)}">
-    <input class="micon" data-cicon="${c.id}" value="${esc(c.icon||'')}" maxlength="8" placeholder="🙂" aria-label="Icon for ${esc(c.name)}">
-    <input class="mname" data-cname="${c.id}" value="${esc(c.name)}" maxlength="40" aria-label="Name of category ${i+1}"></div>
-    <div class="mbtns"><button class="btn alt sv" data-catup="${c.id}" ${i===0?'disabled':''}>↑ Up</button><button class="btn alt sv" data-catdown="${c.id}" ${i===n-1?'disabled':''}>↓ Down</button><button class="rm" data-catdel="${c.id}">Delete</button></div>${grpEditor(c)}${panel}</li>`}
-
+// ---- Edit habits page (#/manage): Foldable base showing Category -> Nested Groups -> Habits, plus Add habit / Add category / Archived ----
 export function syncAddGroups(){
   const cs=$('cat'),gsel=$('grp');if(!cs||!gsel)return;
   const tree=groupTreeList(S.grps,cs.value);
@@ -265,35 +239,211 @@ export function syncAddGroups(){
   gsel.hidden=!tree.length;
 }
 
+function manageHabitRow(h){
+  const st=freezeState(h),frz=isFrozenNow(h);
+  const meta=[kindName(h),h.type==='bool'||h.type==='text'?'':goalVal(h),isPeriodic(h)?freqText(h):''].filter(Boolean).join(' · ');
+  return `<div class="mhab${frz?' is-frz':''}">
+    <div class="mhab-main">
+      <a class="mhab-name" href="${href.habit(h.id)}">${esc(h.name)}</a>
+      <span class="mhab-meta">${esc(meta)}</span>
+      ${frz?'<span class="mpill ice">❄ Frozen</span>':st.pending?'<span class="mpill ice">❄ Tomorrow</span>':''}
+    </div>
+    <div class="mhab-act">
+      ${st.on||st.pending?`<button type="button" class="btn sv" data-unfreeze="${h.id}">${st.on?'Unfreeze':'Cancel'}</button>`:`<button type="button" class="btn alt sv" data-freeze="${h.id}">❄ Freeze</button>`}
+      <button type="button" class="rm" data-archive="${h.id}">Archive</button>
+    </div>
+  </div>`;
+}
+
+function manageGroupNode(g,c,i,sibCount,depth=0){
+  const direct=sortByOrder(inGroup(S.habits,g));
+  const deep=inGroupDeep(S.habits,S.grps,g);
+  const subs=childGroups(S.grps,c.id,g.id);
+  const folded=isFolded('mgrp:'+g.id,true);
+  const edOpen=!isFolded('mgrp-ed:'+g.id,true);
+  const cnt=deep.length;
+  const editBar=edOpen?`<div class="medbar">
+    <div class="medrow">
+      <input class="mname" data-gname="${g.id}" value="${esc(g.name)}" maxlength="40" aria-label="Rename group">
+      <button type="button" class="btn alt sv" data-grpup="${g.id}" ${i===0?'disabled':''} aria-label="Move up">↑</button>
+      <button type="button" class="btn alt sv" data-grpdown="${g.id}" ${i===sibCount-1?'disabled':''} aria-label="Move down">↓</button>
+      <button type="button" class="rm" data-grpdel="${g.id}">Delete</button>
+    </div>
+    <form class="addgrp" data-gcat="${c.id}">
+      <input type="hidden" name="parent" value="${g.id}">
+      <input name="gname" maxlength="40" placeholder="New sub-group inside ${esc(g.name)}…" aria-label="New sub-group name" required>
+      <button class="btn alt sv">+ Sub-group</button>
+    </form>
+  </div>`:'';
+
+  return `<div class="mgrp${depth?' sub':''}">
+    <div class="mgrp-h">
+      <button type="button" class="ftog" data-fold="mgrp:${g.id}" aria-expanded="${!folded}">
+        <span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span>
+        <span class="mgrp-title">${esc(g.name)}</span>
+        <span class="mpill">${cnt}</span>
+      </button>
+      <span class="mnode-act">
+        <button type="button" class="btn alt sv" data-maddhabit="${c.id}|${g.id}" title="Add a habit inside ${esc(g.name)}">+ Habit</button>
+        <button type="button" class="btn alt sv" data-fold="mgrp-ed:${g.id}" aria-expanded="${edOpen}">${edOpen?'Done':'Edit'}</button>
+      </span>
+    </div>
+    ${editBar}
+    ${folded?'':`<div class="mgrp-b">
+      ${direct.length?`<div class="mhab-list">${direct.map(manageHabitRow).join('')}</div>`:''}
+      ${subs.map((sg,si)=>manageGroupNode(sg,c,si,subs.length,depth+1)).join('')}
+      ${!direct.length&&!subs.length?'<p class="hint" style="margin:6px 0 2px">No habits in this group yet.</p>':''}
+    </div>`}
+  </div>`;
+}
+
+function manageCatCard(c,i,n){
+  const allLive=sortByOrder(inCat(S.habits,c.id));
+  const frzCount=allLive.filter(isFrozenNow).length;
+  const actCount=allLive.length-frzCount;
+  const own=loose(allLive,c.id,S.grps);
+  const topGrps=childGroups(S.grps,c.id,null);
+  const tree=groupTreeList(S.grps,c.id);
+  const folded=isFolded('mcat:'+c.id,true);
+  const edOpen=!isFolded('mcat-ed:'+c.id,true);
+
+  const allWithArch=S.habits.filter(h=>h.cat===c.id),arch=allWithArch.filter(h=>h.archived).length,others=S.cats.filter(x=>x.id!==c.id);
+  let delPanel='';
+  if(S.delCat===c.id){
+    if(!others.length)delPanel=`<div class="delpanel" role="alert">You need at least one category. <button type="button" class="btn alt sv" data-catdelcancel="1">OK</button></div>`;
+    else if(!allWithArch.length)delPanel=`<div class="delpanel" role="alert">Delete “${esc(c.name)}”? <button type="button" class="btn sv" data-catdelgo="${c.id}">Delete category</button><button type="button" class="btn alt sv" data-catdelcancel="1">Cancel</button></div>`;
+    else delPanel=`<div class="delpanel" role="alert"><span>“${esc(c.name)}” has ${allWithArch.length} habit${allWithArch.length===1?'':'s'}${arch?` (${arch} archived)`:''}. Move them to</span>
+      <select id="delTarget" aria-label="Move habits to">${others.map(o=>`<option value="${o.id}">${esc((o.icon?o.icon+' ':'')+o.name)}</option>`).join('')}</select>
+      <button type="button" class="btn sv" data-catdelgo="${c.id}">Move &amp; delete</button><button type="button" class="btn alt sv" data-catdelcancel="1">Cancel</button></div>`;
+  }
+
+  const editBar=edOpen?`<div class="medbar">
+    <div class="medrow">
+      <input type="color" class="mcolor" data-ccolor="${c.id}" value="${c.color}" aria-label="Colour for ${esc(c.name)}">
+      <input class="micon" data-cicon="${c.id}" value="${esc(c.icon||'')}" maxlength="8" placeholder="🙂" aria-label="Icon for ${esc(c.name)}">
+      <input class="mname" data-cname="${c.id}" value="${esc(c.name)}" maxlength="40" aria-label="Name of category">
+      <button type="button" class="btn alt sv" data-catup="${c.id}" ${i===0?'disabled':''} aria-label="Move up">↑</button>
+      <button type="button" class="btn alt sv" data-catdown="${c.id}" ${i===n-1?'disabled':''} aria-label="Move down">↓</button>
+      <button type="button" class="rm" data-catdel="${c.id}">Delete</button>
+    </div>
+    <form class="addgrp" data-gcat="${c.id}">
+      <input name="gname" maxlength="40" placeholder="New group in ${esc(c.name)}, e.g. Wird…" aria-label="New group name" required>
+      ${tree.length?`<select name="parent" aria-label="Parent group"><option value="">Top level</option>${tree.map(({g,depth})=>`<option value="${g.id}">Inside: ${'— '.repeat(depth)+esc(g.name)}</option>`).join('')}</select>`:''}
+      <button class="btn alt sv">+ Add group</button>
+    </form>
+    ${delPanel}
+  </div>`:delPanel;
+
+  const badge=frzCount?`${actCount} active · ${frzCount} frozen`:`${allLive.length} habit${allLive.length===1?'':'s'}`;
+
+  return `<article class="mcat${folded?' folded':''}" style="--c:${c.color}">
+    <div class="mcat-h">
+      <button type="button" class="ftog mcat-tog" data-fold="mcat:${c.id}" aria-expanded="${!folded}">
+        <span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span>
+        <span class="cb-icon" aria-hidden="true">${esc(c.icon||'●')}</span>
+        <span class="mcat-name">${esc(c.name)}</span>
+        <span class="mpill">${badge}</span>
+      </button>
+      <span class="mnode-act">
+        <button type="button" class="btn alt sv" data-maddhabit="${c.id}|" title="Add a habit to ${esc(c.name)}">+ Habit</button>
+        <button type="button" class="btn alt sv" data-fold="mcat-ed:${c.id}" aria-expanded="${edOpen}">${edOpen?'Done':'Edit'}</button>
+      </span>
+    </div>
+    ${editBar}
+    ${folded?'':`<div class="mcat-b">
+      ${own.length?`<div class="mhab-list">${own.map(manageHabitRow).join('')}</div>`:''}
+      ${topGrps.map((g,gi)=>manageGroupNode(g,c,gi,topGrps.length,0)).join('')}
+      ${!own.length&&!topGrps.length?'<p class="hint" style="margin:6px 0 2px">No habits in this category yet. Click “+ Habit” above.</p>':''}
+    </div>`}
+  </article>`;
+}
+
 function renderManage(){
-  const allLive=live(S.habits),active=allLive.filter(h=>!isFrozenNow(h)),frozen=allLive.filter(h=>isFrozenNow(h));
   const arch=S.habits.filter(h=>h.archived),msg=S.catMsg||'';S.catMsg='';
+  const addOpen=!isFolded('m:add',true);
+  const addCatFold=isFolded('m:addcat',true);
+  const archFold=isFolded('m:arch',true);
   const catName=h=>{const c=S.cats.find(x=>x.id===h.cat);const gp=h.grp?groupPath(S.grps,h.grp):'';return (c?c.name:'No category')+(gp?' › '+gp:'')};
-  const hRow=h=>{const st=freezeState(h);
-    return `<div class="assignrow">
-      <span><a class="name nm" href="${href.habit(h.id)}">${esc(h.name)}</a><span class="desc"> · ${esc(catName(h))}${st.pending?' · ❄ freezes tomorrow':''}</span></span>
-      <span class="mbtns">
-        ${st.on||st.pending?`<button class="btn sv" data-unfreeze="${h.id}">${st.on?'Unfreeze':'Cancel freeze'}</button>`:`<button class="btn alt sv" data-freeze="${h.id}">❄ Freeze</button>`}
-        <button class="rm" data-archive="${h.id}">Archive</button>
-      </span></div>`};
 
   $('page').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span><span aria-current="page">Edit habits</span></nav>
-  <h2 class="dname">Edit habits</h2>
-  <section aria-labelledby="ahT"><h2 id="ahT">Active habits (${active.length})</h2>
-    <p class="hint">Freeze pauses a habit and hides it from active lists (like Archive), while keeping all past logs in heatmaps and statistics.</p>
-    ${active.length?active.map(hRow).join(''):'<p class="empty">No active habits yet. Add one using the form below.</p>'}</section>
-  ${frozen.length?`<section aria-labelledby="fzT"><h2 id="fzT">Frozen habits (${frozen.length})</h2>
-    <p class="hint">Hidden from active lists. All previous days remain visible in heatmaps and statistics.</p>
-    ${frozen.map(hRow).join('')}</section>`:''}
-  <section aria-labelledby="mcT"><h2 id="mcT">Categories &amp; nested groups</h2><p class="hint">Edit name, icon, colour, order, and nested groups (e.g. Wird inside Deen).</p>
-    <ul class="mrows">${S.cats.map((c,i)=>catRow(c,i,S.cats.length)).join('')}</ul></section>
-  <section aria-labelledby="acT"><h2 id="acT">Add a category</h2>
-    <form id="addcat"><input type="color" class="mcolor" id="newCatColor" value="${nextColor(S.cats)}" aria-label="Colour"><input class="micon" id="newCatIcon" maxlength="8" placeholder="🙂" aria-label="Icon"><input id="newCatName" class="mname" maxlength="40" placeholder="New category, e.g. Fitness" required><button class="btn">Add category</button></form>
-    <p class="uns" role="status">${esc(msg)}</p></section>
-  <section aria-labelledby="arT"><h2 id="arT">Archived habits</h2>
-    ${arch.length?arch.map(h=>`<div class="assignrow"><span><a class="name nm" href="${href.habit(h.id)}">${esc(h.name)}</a><span class="desc"> · ${esc(catName(h))}</span></span><span class="mbtns"><button class="btn alt sv" data-restore="${h.id}">Restore</button><button class="rm" data-rm="${h.id}">Delete forever</button></span></div>`).join(''):'<p class="empty">Nothing archived.</p>'}</section>`;
+  <div class="sec-hd">
+    <h2 class="dname" style="margin:0">Edit habits</h2>
+    <span class="foldtools">
+      <button type="button" class="btn alt sv" data-mfoldall="1">Fold all</button>
+      <button type="button" class="btn alt sv" data-mfoldall="0">Expand all</button>
+    </span>
+  </div>
+  <div class="mtoolbar">
+    <button type="button" class="btn sv" data-fold="m:add" aria-expanded="${addOpen}">${addOpen?'Hide “Add habit”':'+ Add habit'}</button>
+    <button type="button" class="btn alt sv" data-fold="m:addcat" aria-expanded="${!addCatFold}">${addCatFold?'+ Add category':'Hide “Add category”'}</button>
+    ${msg?`<span class="uns" role="status">${esc(msg)}</span>`:''}
+  </div>
+  ${addCatFold?'':`<section class="maddcat" aria-labelledby="acT"><h2 id="acT">Add a category</h2>
+    <form id="addcat"><input type="color" class="mcolor" id="newCatColor" value="${nextColor(S.cats)}" aria-label="Colour"><input class="micon" id="newCatIcon" maxlength="8" placeholder="🙂" aria-label="Icon"><input id="newCatName" class="mname" maxlength="40" placeholder="New category, e.g. Fitness" required><button class="btn">Add category</button></form></section>`}
+  <div class="mtree" aria-label="Categories, groups and habits">
+    ${S.cats.map((c,i)=>manageCatCard(c,i,S.cats.length)).join('')}
+  </div>
+  <section class="march" aria-labelledby="arT">
+    <div class="sec-hd" style="margin:0">
+      <h2 id="arT"><button type="button" class="ftog" data-fold="m:arch" aria-expanded="${!archFold}"><span class="farr" aria-hidden="true">${archFold?'▸':'▾'}</span> Archived habits <span class="mpill">${arch.length}</span></button></h2>
+    </div>
+    ${archFold?'':`<div class="march-b">${arch.length?arch.map(h=>`<div class="mhab"><div class="mhab-main"><a class="mhab-name" href="${href.habit(h.id)}">${esc(h.name)}</a><span class="mhab-meta">${esc(catName(h))}</span></div><div class="mhab-act"><button type="button" class="btn alt sv" data-restore="${h.id}">Restore</button><button type="button" class="rm" data-rm="${h.id}">Delete forever</button></div></div>`).join(''):'<p class="empty" style="margin-top:8px">Nothing archived.</p>'}</div>`}
+  </section>`;
   $('addT').textContent='Add a habit';
   syncAddGroups();
+}
+
+function reqBadgeHTML(h){
+  const rs=reqStreaks(h);if(!rs||!rs.current)return '';
+  const c=rs.current;
+  if(c.skipped)return `<span class="kchip rq-skip" title="Skipped: ${esc(c.skipReason)}">Req skipped</span>`;
+  if(c.wellDone)return `<span class="kchip rq-ok">Well done ✓ (${c.done}/${c.req.x})</span>`;
+  return `<span class="kchip rq-prog">Req: ${c.done}/${c.req.x}</span>`;
+}
+
+function reqSectionHTML(h){
+  const rs=reqStreaks(h);if(!rs)return '';
+  const foldKey='hrq:'+h.id,folded=isFolded(foldKey,true);
+  const recent=[...rs.periods].reverse().slice(0,12);
+  const rows=recent.map(p=>{
+    const st=p.skipped?`<span class="dbadge">Skipped${p.skipReason?' · '+esc(p.skipReason):''}</span>`
+      :p.wellDone?`<span class="dbadge rq-ok">Well done ✓</span>`
+      :!p.complete?`<span class="dbadge">${p.canStillMeet?'In progress':'Missed'}</span>`
+      :`<span class="dbadge rq-miss">Missed</span>`;
+    const btn=p.skipped
+      ?`<button type="button" class="btn alt sv" data-rqunskip="${h.id}|${p.key}">Undo skip</button>`
+      :`<button type="button" class="btn alt sv" data-rqskip="${h.id}|${p.key}">Skip req</button>`;
+    return `<div class="rqrow"><span><b>${esc(fmt(p.start))} – ${esc(fmt(p.end))}</b> · ${p.done}/${p.req.x} days (${esc(reqText(p.req))})</span><span class="mbtns">${st}${btn}</span></div>`;
+  }).join('');
+  return `<div class="rqbox">
+    <div class="rqstreaks">
+      <span class="rqst">Done-days streak: <b>${rs.doneDays}</b> day${rs.doneDays===1?'':'s'}</span>
+      <span class="rqst">All-days streak: <b>${rs.allDays}</b> day${rs.allDays===1?'':'s'}</span>
+      ${rs.totalComplete?`<span class="rqst">Well done: <b>${rs.wellDoneCount}/${rs.totalComplete}</b> periods</span>`:''}
+    </div>
+    <div class="sec-hd" style="margin:8px 0 4px">
+      <button type="button" class="ftog sm" data-fold="${foldKey}" aria-expanded="${!folded}"><span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span> Required periods &amp; Skip req (${rs.periods.length})</button>
+    </div>
+    ${folded?'':`<div class="rqlist">${rows}</div>`}
+  </div>`;
+}
+
+function renderCode(){
+  const text=S.codeDraft!==undefined&&S.codeDraft!==null?S.codeDraft:exportCodeDB(S);
+  const errs=S.codeErrors||[];
+  const msg=S.codeMsg||'';
+  $('page').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span><span aria-current="page">Code DB</span></nav>
+  <h2 class="dname">Code DB</h2>
+  <section class="codedb-sec">
+    <p class="hint">Edit your entire database as plain text (Minimal YAML-like). Latest dates are at the top; config is at the bottom. Nothing is saved if there is a syntax error.</p>
+    <div class="dayrow">
+      <button type="button" class="btn" data-codeapply="1">Apply &amp; Sync</button>
+      <button type="button" class="btn alt sv" data-codereset="1">Reset to current DB</button>
+      <span class="uns" role="status">${esc(msg)}</span>
+    </div>
+    ${errs.length?`<div class="codeerr" role="alert"><b>Fix ${errs.length} error${errs.length===1?'':'s'} before saving:</b><ul>${errs.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>`:''}
+    <textarea id="codeEditor" class="codeed" spellcheck="false" aria-label="Habit tracker code database">${esc(text)}</textarea>
+  </section>`;
 }
 
 function renderMissing(what){
@@ -313,7 +463,8 @@ function renderMain(){
   if(R.name==='habit'){const h=H.find(x=>x.id===R.id);
     if(h){S.open=h.id;document.title=h.name+' · Habit tracker';renderDetail(h);show('detail')}
     else{renderMissing('Habit');show('page')}}
-  else if(R.name==='manage'){document.title='Edit habits · Habit tracker';renderManage();show('page','add')}
+  else if(R.name==='manage'){document.title='Edit habits · Habit tracker';renderManage();if(!isFolded('m:add',true))show('page','add');else show('page')}
+  else if(R.name==='code'){document.title='Code DB · Habit tracker';renderCode();show('page')}
   else if(R.name==='day'){if(!renderDay(R.id))renderMissing('Day');show('page')}
   else if(R.name==='cat'){const c=S.cats.find(x=>x.id===R.id);
     if(c){document.title=c.name+' · Habit tracker';renderCategory(c);show('page')}
@@ -337,7 +488,7 @@ function renderDetail(h){
     t=K(T()),gf=S.goalFrom&&S.goalFrom.id===h.id?S.goalFrom.k:t,hist=goalHistory(h),
     f=isPeriodic(h)?cleanFreq(h.fq):null,isM=h.type==='min';
 
-  const hmFold=isFolded('hhm:'+h.id,false),edFold=isFolded('hed:'+h.id,false),prFold=isFolded('hpr:'+h.id,false),anFold=isFolded('han:'+h.id,false);
+  const hmFold=isFolded('hhm:'+h.id,false),edFold=isFolded('hed:'+h.id,false),prFold=isFolded('hpr:'+h.id,true),anFold=isFolded('han:'+h.id,true);
   const histLine=hist.length>1?`<div class="hint" style="margin:4px 0 0">${hist.map(([d,g])=>`${esc(fmt(d))}: <b>${isM?fmtHHMM(g):g+(h.unit?' '+esc(h.unit):'')}</b>`).join(' · ')}</div>`:'';
 
   const propsTable=`<table class="ptbl"><tbody>
@@ -354,6 +505,17 @@ function renderDetail(h){
       <span class="hint" style="margin:0">from</span>
       <input type="date" id="goalFrom" value="${gf}" min="${h.created}" max="${t}" aria-label="Applies from">
     </div>${histLine}</td></tr>`}
+    ${(()=>{const rf=S.reqFrom&&S.reqFrom.id===h.id?S.reqFrom.k:t,curR=reqOn(h,rf),rHist=reqHistory(h);
+    const rHistLine=rHist.length?`<div class="hint" style="margin:4px 0 0">${rHist.map(([d,r])=>`${esc(fmt(d))}: <b>${esc(reqText(r))}</b> <button type="button" class="rm" data-rqdel="${d}" title="Remove this entry">×</button>`).join(' · ')}</div>`:'';
+    return `<tr><th>Required days</th><td><div class="row">
+      <input type="number" id="rqX" min="1" max="365" value="${curR?curR.x:''}" placeholder="X" style="width:64px" aria-label="Required days X">
+      <span class="hint" style="margin:0">/</span>
+      <select id="rqPer" aria-label="Required period"><option value=""${!curR?' selected':''}>None</option><option value="week"${curR&&curR.per==='week'?' selected':''}>week</option><option value="month"${curR&&curR.per==='month'?' selected':''}>month</option><option value="days"${curR&&curR.per==='days'?' selected':''}>Y days</option></select>
+      ${curR&&curR.per==='days'?`<input type="number" id="rqY" min="1" max="365" value="${curR.y}" placeholder="Y" style="width:64px" aria-label="Period length Y days">`:''}
+      <span class="hint" style="margin:0">from</span>
+      <input type="date" id="rqFrom" value="${rf}" min="${h.created}" max="${t}" aria-label="Required days from">
+      <button type="button" class="btn alt sv" data-rqsave="1">Set</button>
+    </div>${rHistLine}</td></tr>`})()}
     <tr><th>Importance</th><td><select id="impIn">${IMPS.map((n,i)=>`<option value="${i+1}"${imp(h)===i+1?' selected':''}>${i+1} · ${n}</option>`).join('')}</select></td></tr>
     ${h.stop?'':`<tr><th>How often</th><td><div class="row">
       <select id="fqMode"><option value=""${f?'':' selected'}>Every day</option><option value="p"${f?' selected':''}>Periodic</option></select>
@@ -365,13 +527,14 @@ function renderDetail(h){
   $('detail').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span>${cat?`<a href="${href.cat(cat.id)}">${esc(cat.name)}</a><span aria-hidden="true">›</span>`:''}<span aria-current="page">${esc(h.name)}</span></nav>
   <h2 class="dname">${esc(h.name)}</h2>
   <div class="meta">${streakHTML(h)}<span>${isPeriodic(h)?'Checked':'Done'} <b>${Object.keys(h.done).length}</b> days</span>${isPeriodic(h)?`<span class="kchip per">${esc(freqText(h))}</span>`:''}</div>
+  ${reqSectionHTML(h)}
   ${frzBanner(h)}
   ${h.archived?`<div class="archbanner" role="status"><span>Archived</span><button class="btn sv" data-restore="${h.id}">Restore</button></div>`:''}
 
-  <div class="sec-hd" style="margin-top:14px"><h2><button type="button" class="ftog" data-fold="hhm:${h.id}" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> Heatmap</button></h2></div>
+  <div class="sec-hd" style="margin-top:14px"><h2><button type="button" class="ftog" data-fold="hhm:${h.id}" aria-expanded="${!hmFold}"><span class="farr" aria-hidden="true">${hmFold?'▸':'▾'}</span> Heatmap</button></h2></div>
   ${hmFold?'':`${heatmap({habits:S.habits,one:h,size:'large',id:'heatH'})}${legendHTML()}`}
 
-  <div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="hed:${h.id}" aria-expanded="${!edFold}"><span>${edFold?'▸':'▾'}</span> Edit day</button></h2></div>
+  <div class="sec-hd" style="margin-top:16px"><h2><button type="button" class="ftog" data-fold="hed:${h.id}" aria-expanded="${!edFold}"><span class="farr" aria-hidden="true">${edFold?'▸':'▾'}</span> Edit day</button></h2></div>
   ${edFold?'':`<div class="dayrow"><input type="date" id="dayPick" value="${k}" max="${t}">${logHTML(h,k,false)}</div>
   ${h.type==='bool'||h.type==='text'?'':`<p class="hint">${h.stop?'Limit':'Goal'} on ${fmt(k)}: <b>${goalVal(h,k)}</b></p>`}
   <p class="hint">${levelHint(h)}</p>
@@ -381,10 +544,10 @@ function renderDetail(h){
   ${ns.length?`<ul class="ntrows">${ns.map((n,i)=>noteRow(n,i,ns.length,dr&&dr.v&&dr.v[n.id]!==undefined?dr.v[n.id]:n.t)).join('')}</ul>`:'<p class="empty" style="margin-bottom:12px">No notes for this day.</p>'}
   <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>`}
 
-  <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="hpr:${h.id}" aria-expanded="${!prFold}"><span>${prFold?'▸':'▾'}</span> Properties</button></h2></div>
+  <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="hpr:${h.id}" aria-expanded="${!prFold}"><span class="farr" aria-hidden="true">${prFold?'▸':'▾'}</span> Properties</button></h2></div>
   ${prFold?'':propsTable}
 
-  <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="han:${h.id}" aria-expanded="${!anFold}"><span>${anFold?'▸':'▾'}</span> All notes</button></h2></div>
+  <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="han:${h.id}" aria-expanded="${!anFold}"><span class="farr" aria-hidden="true">${anFold?'▸':'▾'}</span> All notes</button></h2></div>
   ${anFold?'':'<div id="notelist"></div>'}
 
   ${statsSection('h',h.id,[h])}`;

@@ -25,10 +25,10 @@ export function renderHome(){
   const H=live(S.habits);
   const hmFold=isFolded('home:hm',false);
   $('home').innerHTML=`<section aria-labelledby="homeHeatT">
-    <div class="sec-hd"><h2 id="homeHeatT"><button type="button" class="ftog" data-fold="home:hm" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> All habits · 20 weeks</button></h2>
+    <div class="sec-hd"><h2 id="homeHeatT"><button type="button" class="ftog" data-fold="home:hm" aria-expanded="${!hmFold}"><span class="farr" aria-hidden="true">${hmFold?'▸':'▾'}</span> All habits · 20 weeks</button></h2>
       ${H.length?`<a class="btn alt sv" href="${href.day(K(T()))}">Edit today</a>`:''}</div>
     ${hmFold?'':`${modeSwitch(H,'heat')}${heatmap({habits:H,size:'large',id:'heat'})}${legendHTML(periodic(H).length>0)}`}
     ${H.length?'':'<p class="empty" style="margin-top:12px">No habits yet. Open “Edit habits” below to add your first one.</p>'}</section>
-  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><a class="mlink" href="${href.manage}">Edit habits</a></div>
+  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><span class="hlinks"><a class="mlink" href="${href.code}">Code DB</a> · <a class="mlink" href="${href.manage}">Edit habits</a></span></div>
   <nav class="cats" aria-labelledby="catsT">${S.cats.map(catButton).join('')}</nav>
   ${H.length?statsSection('a','all',H):''}`}

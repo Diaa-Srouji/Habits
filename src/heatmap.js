@@ -1,4 +1,4 @@
-// The reusable heatmap component (3 sizes), its scoped day popover, and keyboard access.
+// The reusable heatmap component (3 sizes) with month/weekday axes, scoped day popover, and keyboard access.
 import {S} from './state.js';
 import {K,add,dateOf,mondayOf,esc} from './util.js';
 import {isOff,isFrozen,isLogged,pctOf,dayPercent,paint,pctText,amtFull,txtAmt,periods,sumOf,dayNotes,textDays,
@@ -43,6 +43,22 @@ function cell(d,first,one,H,P,o){
   const g=paint(p,!!one);
   return mk(g.cls+pc+ed+now+sel+hn,label,g.style?` style="${g.style}"`:'',mark)}
 
+// Build month labels aligned to the 20 week columns
+function monthAxis(start){
+  let html='',prevM=-1,lastCol=-3;
+  for(let w=0;w<W;w++){
+    const d=add(start,w*7),m=d.getMonth();
+    const show=m!==prevM&&(w-lastCol>=2||w===0);
+    if(show){
+      const lbl=d.toLocaleDateString(undefined,{month:'short'});
+      html+=`<span style="grid-column:${w+1}">${esc(lbl)}</span>`;
+      lastCol=w;
+    }
+    prevM=m;
+  }
+  return `<div class="hmonths" aria-hidden="true">${html}</div>`;
+}
+
 // scope: '' (all habits), 'c:<catId>' (one category), or 'g:<grpId>' (one group + nested sub-groups)
 export function heatmap({habits,one=null,size='large',interactive=true,id='',full=false,scope=''}){
   const P=periods(),sm=size==='small',st=!interactive,mode=one?'all':modeFor(habits),
@@ -53,10 +69,21 @@ export function heatmap({habits,one=null,size='large',interactive=true,id='',ful
   else{n=W*7;const cur=mondayOf(P.t),wk0=mondayOf(first);start=full||Math.round((cur-wk0)/6048e5)>=W?add(cur,-(W-1)*7):wk0}
   const H=one?habits:daily(habits);
   let cells='';for(let i=0;i<n;i++)cells+=cell(add(start,i),first,one,H,P,o);
-  const grid=`<div class="heat heat-${size==='small'?'sm':size==='medium'?'md':'lg'}"${id?` id="${id}"`:''}${scope?` data-scope="${esc(scope)}"`:''}${st?' aria-hidden="true"':' role="group" aria-label="Heatmap"'}>${cells}</div>`;
-  return sm?grid:`<div class="scroll">${grid}</div>`}
+  const sz=sm?'sm':size==='medium'?'md':'lg';
+  const grid=`<div class="heat heat-${sz}"${id?` id="${id}"`:''}${scope?` data-scope="${esc(scope)}"`:''}${st?' aria-hidden="true"':' role="group" aria-label="Heatmap"'}>${cells}</div>`;
+  if(sm)return grid;
+  const days='<div class="hdays" aria-hidden="true"><span>M</span><span></span><span>W</span><span></span><span>F</span><span></span><span></span></div>';
+  return `<div class="scroll"><div class="hframe hframe-${sz}">${monthAxis(start)}${days}${grid}</div></div>`}
 
-export const legendHTML=(periodicToo=false)=>'<div class="legend"><i class="lgr"></i> 0% · <i class="gbar"></i> &gt;0% → 100% → 200% (darker = more) · <i class="lgm"></i> Not logged · <i class="sksw"></i> Skipped · <i class="icsw"></i> Frozen'+(periodicToo?' · <i class="pmsw"><i class="pmk"></i></i> Periodic checked · <i class="posw"></i> Only periodic':'')+'</div>';
+export const legendHTML=(periodicToo=false)=>
+  '<div class="legend" aria-label="Heatmap legend">'
+  +'<span class="lgit"><i class="lgr"></i>0%</span>'
+  +'<span class="lgit">Less<i class="gbar"></i>More (200%)</span>'
+  +'<span class="lgit"><i class="lgm"></i>Empty</span>'
+  +'<span class="lgit"><i class="sksw"></i>Skipped</span>'
+  +'<span class="lgit"><i class="icsw"></i>Frozen</span>'
+  +(periodicToo?'<span class="lgit"><i class="pmsw"><i class="pmk"></i></i>Periodic</span><span class="lgit"><i class="posw"></i>Only periodic</span>':'')
+  +'</div>';
 
 export function rove(box){if(!box)return;const cells=[...box.querySelectorAll('[data-pk]')];if(!cells.length)return;
   const tgt=box.querySelector('.now')||[...cells].reverse().find(c=>!c.classList.contains('fut'))||cells[0];
@@ -68,14 +95,14 @@ function popHTML(k,hid,scope=''){
   let H=S.habits.filter(h=>!h.archived);
   if(scope.startsWith('c:'))H=H.filter(h=>h.cat===scope.slice(2));
   else if(scope.startsWith('g:')){const ids=descendantGroupIds(S.grps,scope.slice(2));H=H.filter(h=>ids.has(h.grp))}
-  let out=`<div class="ph">${d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short',year:'numeric'})}</div>`;
+  let out=`<div class="ph">${d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</div>`;
   if(d>P.t)return out+'<div class="pl">Upcoming</div>';
   const extra=h=>{const s=sumOf(h,k);
     return (s?`<div class="ps">${esc(s)}</div>`:'')+dayNotes(h,k).filter(n=>n.t.trim()).map(n=>`<div class="pn">${esc(n.t)}</div>`).join('')};
   const line=h=>{if(isFrozen(h,k)){return `<div class="pl"><i class="pd" style="background:var(--ice)"></i>${one?'':esc(h.name)+': '}<b>❄ Frozen</b>${extra(h)}</div>`}
     if(isOff(h,k)){return `<div class="pl"><i class="pd" style="background:var(--skip)"></i>${one?'':esc(h.name)+': '}<b>Skipped</b> · ${esc(h.off[k]||'no reason')}${extra(h)}</div>`}
     const v=h.done[k]||0,lg=isPeriodic(h)?isChecked(h,k):isLogged(h,k),sw=lg?paint(pctOf(h,v,k)):null;
-    const txt=lg?`<b>${txtAmt(h,v)}</b>${h.type==='bool'?'':' · '+amtFull(h,v,k)}`:(today?'Not logged yet':'Not logged'+(!one&&!h.stop?' · counts as 0%':''));
+    const txt=lg?`<b>${txtAmt(h,v)}</b>${h.type==='bool'?'':' · '+amtFull(h,v,k)}`:(today?'Not logged yet':'Not logged'+(!one&&!h.stop?' · 0%':''));
     return `<div class="pl"><i class="pd${sw?' '+sw.cls:''}"${sw&&sw.style?` style="${sw.style}"`:''}></i>${one?'':esc(h.name)+': '}${txt}${extra(h)}</div>`};
   const Hd=daily(H),mode=periodic(H).length?getMode():'all';
   const pline=h=>{const v=h.done[k],g=mode==='periods'?paint(pctOf(h,v,k)):null,

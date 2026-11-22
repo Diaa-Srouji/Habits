@@ -49,6 +49,110 @@ export function setGoal(h,goal,from=K(T())){const t=K(T());
   h.goal=goalOn(h,t);return true}
 export const goalVal=(h,k)=>h.type==='min'?fmtHHMM(goalOn(h,k)):goalOn(h,k)+(h.unit?' '+esc(h.unit):'');
 
+
+// ---- Time-varying Required Days (rq) & Skip req (rqs) ----
+// rq: { "YYYY-MM-DD": { x: number, per: "week"|"month"|"days", y?: number } }
+// rqs: { "<periodKey>": "<reason>" }  where periodKey is w:YYYY-MM-DD, m:YYYY-MM, or d:YYYY-MM-DD:Y
+export function cleanReq(r){
+  if(!r||typeof r!=='object'||Array.isArray(r))return undefined;
+  const per=r.per;if(!['week','month','days'].includes(per))return undefined;
+  const x=Math.round(Number(r.x));if(!Number.isFinite(x)||x<1)return undefined;
+  if(per==='week'){if(x>7)return undefined;return{x,per}}
+  if(per==='month'){if(x>31)return undefined;return{x,per}}
+  const y=Math.round(Number(r.y));if(!Number.isFinite(y)||y<1||y>365||x>y)return undefined;
+  return{x,per:'days',y}}
+
+export const reqHistory=h=>Object.keys(h.rq||{}).filter(d=>DK.test(d)&&!!cleanReq(h.rq[d])).sort().map(d=>[d,cleanReq(h.rq[d])]);
+export function reqOn(h,k=K(T())){const hist=reqHistory(h);if(!hist.length)return null;
+  let cur=null;for(const [d,v] of hist){if(d<=k)cur=v;else break}return cur}
+export function setReq(h,req,from=K(T())){const c=cleanReq(req),t=K(T());if(!c||!DK.test(from))return false;
+  if(from>t)from=t;h.rq=h.rq||{};h.rq[from]=c;return true}
+export function delReq(h,from){if(h.rq&&from in h.rq){delete h.rq[from];return true}return false}
+export const reqText=r=>{const c=cleanReq(r);if(!c)return '';return c.per==='days'?`${c.x}/${c.y} days`:`${c.x}/${c.per}`};
+export function skipReqPeriod(h,pKey,reason='Skipped'){if(!pKey)return false;h.rqs=h.rqs||{};h.rqs[pKey]=String(reason||'Skipped').trim().slice(0,60)||'Skipped';return true}
+export function unskipReqPeriod(h,pKey){if(h.rqs&&pKey in h.rqs){delete h.rqs[pKey];return true}return false}
+
+const reqDoneDay=(h,k)=>!isOff(h,k)&&h.done[k]>0;
+
+// Build all req periods from the first rq entry up to `toKey` (default today).
+export function reqPeriods(h,toKey=K(T())){
+  const hist=reqHistory(h);if(!hist.length)return[];
+  const out=[],toD=dateOf(toKey);
+  const countDone=(s,e)=>{let n=0;for(let d=dateOf(s);d<=dateOf(e);d=add(d,1))if(reqDoneDay(h,K(d)))n++;return n};
+  for(let i=0;i<hist.length;i++){
+    const [startStr,req]=hist[i];
+    const nextStr=hist[i+1]?hist[i+1][0]:null;
+    const segEnd=nextStr?add(dateOf(nextStr),-1):toD;
+    if(segEnd<dateOf(startStr))continue;
+    if(req.per==='week'){
+      let wStart=mondayOf(dateOf(startStr));
+      if(K(wStart)<startStr)wStart=add(wStart,7); // only full calendar weeks starting >= startStr
+      while(wStart<=segEnd&&wStart<=toD){
+        const wEnd=add(wStart,6),s=K(wStart),e=K(wEnd),key='w:'+s;
+        if(nextStr&&e>=nextStr)break;
+        const complete=e<toKey||(e===toKey);
+        const capEnd=e>toKey?toKey:e;
+        const done=countDone(s,capEnd);
+        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
+        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
+        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        wStart=add(wStart,7);
+      }
+    }else if(req.per==='month'){
+      let d=dateOf(startStr);
+      let y=d.getFullYear(),m=d.getMonth();
+      if(d.getDate()>1){m++;if(m>11){m=0;y++}} // only full calendar months starting >= startStr
+      while(true){
+        const mStart=new Date(y,m,1),mEnd=new Date(y,m+1,0);
+        if(mStart>segEnd||mStart>toD)break;
+        const s=K(mStart),e=K(mEnd),key='m:'+s.slice(0,7);
+        if(nextStr&&e>=nextStr)break;
+        const capEnd=e>toKey?toKey:e;
+        const done=countDone(s,capEnd);
+        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
+        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
+        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        m++;if(m>11){m=0;y++}
+      }
+    }else{
+      // Custom Y-day blocks starting from startStr
+      let bStart=dateOf(startStr);
+      while(bStart<=segEnd&&bStart<=toD){
+        const bEnd=add(bStart,req.y-1),s=K(bStart),e=K(bEnd),key=`d:${s}:${req.y}`;
+        if(nextStr&&e>=nextStr)break;
+        const capEnd=e>toKey?toKey:e;
+        const done=countDone(s,capEnd);
+        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
+        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
+        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        bStart=add(bStart,req.y);
+      }
+    }
+  }
+  return out;
+}
+
+// Two req-based streaks:
+// 1) doneDays: total >0 days in the current unbroken run of req-meeting/skipped periods (+ current in-progress period)
+// 2) allDays: total calendar days from the start of that unbroken run up to today
+export function reqStreaks(h,toKey=K(T())){
+  const ps=reqPeriods(h,toKey);
+  if(!ps.length)return null;
+  const completed=ps.filter(p=>p.complete);
+  const wellDoneCount=completed.filter(p=>p.wellDone).length;
+  const current=ps[ps.length-1];
+  let runStart=null,doneDays=0;
+  for(let i=ps.length-1;i>=0;i--){
+    const p=ps[i];
+    const okP=p.skipped||p.wellDone||(!p.complete&&p.canStillMeet);
+    if(!okP)break;
+    runStart=p.start;
+    doneDays+=p.done;
+  }
+  const allDays=runStart?Math.max(0,Math.round((dateOf(toKey)-dateOf(runStart))/864e5)+1):0;
+  return{doneDays,allDays,current,periods:ps,wellDoneCount,totalComplete:completed.length};
+}
+
 // ---- Freeze ----
 export const FZ='❄ Frozen',FZE='❄ Frozen (ended)';
 export const isFrozen=(h,k)=>isOff(h,k)&&String(h.off[k]).startsWith('❄');
@@ -160,6 +264,8 @@ export function setAmt(h,k,v){h.skip=h.skip||{};
 export function norm(h){if(!h.goal){h.goal=30;h.unit='min';for(const k in h.done)h.done[k]=30}
   h.type=h.type||'min';h.stop=!!h.stop;h.unit=h.type==='bool'?'':h.type==='text'?'%':h.type==='num'?(h.unit||''):(h.unit||'min');if(h.type==='text')h.goal=100;h.notes=h.notes||{};h.skip=h.skip||{};h.off=h.off||{};h.sum=h.sum||{};h.nts=h.nts||{};h.importance=imp(h);if(!h.created)h.created=Object.keys(h.done).sort()[0]||K(T());
   h.gl=h.gl&&typeof h.gl==='object'&&!Array.isArray(h.gl)?h.gl:{};
+  h.rq=h.rq&&typeof h.rq==='object'&&!Array.isArray(h.rq)?h.rq:{};
+  h.rqs=h.rqs&&typeof h.rqs==='object'&&!Array.isArray(h.rqs)?h.rqs:{};
   if(needsGoalLog(h)&&h.goal>0)h.gl[h.created]=h.goal;
   if(h.fq!==undefined){const f=h.stop?undefined:cleanFreq(h.fq);if(f)h.fq=f;else delete h.fq}
   upgradeNotes(h)}
@@ -209,9 +315,12 @@ export function cleanHabit(h){
     notes:pick(h.notes,v=>typeof v==='string'&&v?v:undefined),
     sum:pick(h.sum,v=>typeof v==='string'&&v.trim()?v:undefined),nts:pickNotes(h.nts),
     gl:type==='bool'||type==='text'?{}:pick(h.gl,num),
+    rq:pick(h.rq,cleanReq),rqs:pickRqs(h.rqs),
     fq:h.stop?undefined:cleanFreq(h.fq)}}
 const NKEY=/^\d{4}-\d{2}-\d{2}_[\w-]{1,24}$/;
 function pickNotes(o){const r={};
   if(o&&typeof o==='object')for(const k in o){const v=o[k];if(!NKEY.test(k)||!v||typeof v!=='object'||typeof v.t!=='string'||!v.t.trim())continue;
     const n={t:v.t,at:Number.isFinite(+v.at)&&+v.at>=0?+v.at:0};if(Number.isFinite(v.o))n.o=v.o;r[k]=n}
   return r}
+
+function pickRqs(o){const r={};if(o&&typeof o==='object')for(const k in o)if(/^(w:\d{4}-\d{2}-\d{2}|m:\d{4}-\d{2}|d:\d{4}-\d{2}-\d{2}:\d{1,3})$/.test(k))r[k]=String(o[k]||'Skipped').slice(0,60);return r}

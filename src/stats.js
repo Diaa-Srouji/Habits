@@ -12,7 +12,7 @@
 // A category mixes types, so its day counts use the combined weighted percentage of each day (the same number the heatmap colours) and
 // its totals are listed per kind, like the Home buttons do.
 import {K,T,add,dateOf,esc} from './util.js';
-import {isOff,isFrozen,isLogged,pctOf,ok,minText,dayPercent,goalOn,DK,SUMS,sumUnit,isPeriodic,isChecked,daily,periodic} from './scoring.js';
+import {isOff,isFrozen,isLogged,pctOf,ok,minText,dayPercent,goalOn,DK,SUMS,sumUnit,isPeriodic,isChecked,daily,periodic,reqHistory,reqPeriods} from './scoring.js';
 
 const EPS=1e-9;
 const f1=n=>Math.round(n*10)/10;
@@ -41,7 +41,7 @@ function clamp(created,from,to){const t=T(),c=dateOf(created),a=dateOf(from),b=d
 export function habitStats(h,from,to){
   if(isPeriodic(h))return periodicStats(h,from,to);
   const tk=K(T()),[a,b]=clamp(h.created,from,to);
-  const r={kind:h.type==='text'?(h.stop?'stopbool':'text'):h.stop?(h.type==='bool'?'stopbool':'stop'):h.type==='bool'?'bool':'amount',
+  const r={from:a,to:b,kind:h.type==='text'?(h.stop?'stopbool':'text'):h.stop?(h.type==='bool'?'stopbool':'stop'):h.type==='bool'?'bool':'amount',
     days:0,frozen:0,skipped:0,logged:0,counted:0,zero:0,pos:0,p50:0,p100:0,p200:0,done:0,missed:0,stopped:0,over:0,atZero:0,sum:0,best:0,saved:0,streak:0};
   let run=0;
   for(let d=a;d<=b;d=add(d,1)){const k=K(d);
@@ -67,7 +67,7 @@ export function habitStats(h,from,to){
 // (a checked day = something above 0 logged). r.logged = checked days, r.pos = the same, r.done = checked days of a True / false habit.
 function periodicStats(h,from,to){
   const [a,b]=clamp(h.created,from,to);
-  const r={kind:h.type==='bool'?'pbool':h.type==='text'?'ptext':'pnum',
+  const r={from:a,to:b,kind:h.type==='bool'?'pbool':h.type==='text'?'ptext':'pnum',
     days:0,frozen:0,skipped:0,logged:0,counted:0,zero:0,pos:0,p50:0,p100:0,p200:0,done:0,missed:0,stopped:0,over:0,atZero:0,sum:0,best:0,saved:0,streak:0};
   for(let d=a;d<=b;d=add(d,1)){const k=K(d);
     if(isFrozen(h,k)){r.frozen++;continue}
@@ -89,6 +89,10 @@ const rate=(a,b)=>a+b?Math.round(a/(a+b)*100)+'%':'–';
 
 // Tiles for one habit: [label, value, optional class]. Values are already safe to put in HTML.
 export function habitRows(h,r){
+  const rows=_habitRows(h,r);
+  if(reqHistory(h).length&&r.from&&r.to){const ps=reqPeriods(h,r.to).filter(p=>p.complete&&p.end>=r.from);if(ps.length)rows.push(['Periods well done',ps.filter(p=>p.wellDone).length+' / '+ps.length])}
+  return rows}
+function _habitRows(h,r){
   const rows=[['Total days',r.days],['Frozen days',r.frozen,'ice'],['Skipped days',r.skipped]],streak=['Longest streak',plural(r.streak,'day')];
   if(r.kind==='pbool')return rows.concat([['Days done',r.done]]);
   if(r.kind==='ptext')return rows.concat([['Days logged',r.logged],['Days above 0%',r.pos],['Days ≥ 50%',r.p50],['Days ≥ 100%',r.p100],

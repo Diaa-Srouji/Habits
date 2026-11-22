@@ -14,7 +14,7 @@
 import {cleanCats,cleanGrps,DEFAULT_CATS,loadCats} from './categories.js';
 import {cleanFreq} from './scoring.js';
 
-export const HABIT_MAPS=['done','skip','off','notes','sum','nts','gl'],CATS_MAPS=['cats','grps'];
+export const HABIT_MAPS=['done','skip','off','notes','sum','nts','gl','rq','rqs'],CATS_MAPS=['cats','grps'];
 const isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
 export const clone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));   // also drops undefined fields (Firestore refuses them)
 // JSON with sorted keys: Firestore returns map fields in alphabetical order, so plain JSON.stringify would call equal things different

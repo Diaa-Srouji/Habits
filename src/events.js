@@ -1,7 +1,8 @@
 // All user-input wiring: forms, buttons, folding, Statistics presets & habit picker, Day page inline editing, nested groups, hh:mm, theme, sign-in, backup.
 import {S} from './state.js';
 import {$,K,T} from './util.js';
-import {cleanFreq,freqText,freeze,unfreeze,unfreezeDay,setGoal,TYPES,unitType,SHORT,shortAmt,pctOf,paint,logPct,setAmt,cleanHabit,addNote,setNote,delNote,moveNote,resetNoteOrder,pruneEmpty,parseHHMM} from './scoring.js';
+import {cleanFreq,freqText,freeze,unfreeze,unfreezeDay,setGoal,TYPES,unitType,SHORT,shortAmt,pctOf,paint,logPct,setAmt,cleanHabit,addNote,setNote,delNote,moveNote,resetNoteOrder,pruneEmpty,parseHHMM,setReq,delReq,skipReqPeriod,unskipReqPeriod} from './scoring.js';
+import {parseCodeDB} from './codedb.js';
 import {render,refreshRange,setRangePreset,syncAddGroups} from './render.js';
 import {unassigned,cleanCats,mergeCats,moveCat,renumber,newCatId,cleanGrps,mergeGrps,renumberGrps,moveGrp,newGrpId,childGroups,live} from './categories.js';
 import {hidePop,setMode} from './heatmap.js';
@@ -74,12 +75,74 @@ const authErr=e=>msg(({'auth/invalid-credential':'Wrong email or password.','aut
 
 export function initEvents(){
   document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
+    
+    // Code DB: Apply & Sync / Reset
+    if(t.dataset.codeapply){
+      const ed=$('codeEditor');if(!ed)return;
+      const res=parseCodeDB(ed.value,S);
+      if(!res.ok){S.codeDraft=ed.value;S.codeErrors=res.errors;S.codeMsg='';render();return}
+      S.cats=res.cats;S.grps=res.grps;S.habits=res.habits;
+      S.codeDraft=null;S.codeErrors=[];S.codeMsg='Applied & synced ✓';
+      save();render();return;
+    }
+    if(t.dataset.codereset){
+      S.codeDraft=null;S.codeErrors=[];S.codeMsg='Reset to current database.';render();return;
+    }
+    // Required days: set / delete / skip period / undo skip
+    if(t.dataset.rqsave){
+      const h=openHabit();if(!h)return;
+      const per=$('rqPer')?.value,from=$('rqFrom')?.value||K(T());
+      if(!per){delReq(h,from);save();render();return}
+      const x=Number($('rqX')?.value),y=Number($('rqY')?.value||7);
+      if(!setReq(h,per==='days'?{x,per:'days',y}:{x,per},from)){alert('Enter valid required days (e.g. 5/week, 20/month, or X <= Y days).');return}
+      save();render();return;
+    }
+    if(t.dataset.rqdel){
+      const h=openHabit();if(!h)return;
+      delReq(h,t.dataset.rqdel);save();render();return;
+    }
+    if(t.dataset.rqskip){
+      const [id,pKey]=t.dataset.rqskip.split('|'),h=S.habits.find(x=>x.id===id),y=scrollY;
+      if(!h)return;
+      const reason=prompt('Reason for skipping req for this period (optional):','');
+      if(reason===null)return;
+      skipReqPeriod(h,pKey,reason||'Skipped');save();render();window.scrollTo(0,y);return;
+    }
+    if(t.dataset.rqunskip){
+      const [id,pKey]=t.dataset.rqunskip.split('|'),h=S.habits.find(x=>x.id===id),y=scrollY;
+      if(!h)return;
+      unskipReqPeriod(h,pKey);save();render();window.scrollTo(0,y);return;
+    }
+
+    
+    // Edit habits: Fold all / Expand all tree
+    if(t.dataset.mfoldall!==undefined){
+      const fold=t.dataset.mfoldall==='1',y=scrollY;
+      S.fold=S.fold||{};
+      S.cats.forEach(c=>{S.fold['mcat:'+c.id]=fold});
+      S.grps.forEach(g=>{S.fold['mgrp:'+g.id]=fold});
+      render();window.scrollTo(0,y);return;
+    }
+    // Edit habits: "+ Habit" inside a specific category or group
+    if(t.dataset.maddhabit!==undefined){
+      const [cid,gid]=t.dataset.maddhabit.split('|');
+      S.fold=S.fold||{};S.fold['m:add']=false;
+      S.addGrp=gid||'';
+      render();
+      if($('cat')&&S.cats.some(c=>c.id===cid)){$('cat').value=cid;syncAddGroups()}
+      const n=$('name');if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.focus()}
+      return;
+    }
+
     // Universal fold / expand (Day page, Category, Habit, Home, Statistics)
     if(t.dataset.fold){
-      const key=t.dataset.fold,y=scrollY;
+      const key=t.dataset.fold,y=scrollY,willFold=t.getAttribute('aria-expanded')==='true';
       S.fold=S.fold||{};
-      S.fold[key]=t.getAttribute('aria-expanded')==='true';
-      render();window.scrollTo(0,y);return;
+      S.fold[key]=willFold;
+      render();
+      if(key==='m:add'&&!willFold){const n=$('name');if(n){n.scrollIntoView({behavior:'smooth',block:'center'});n.focus()}return}
+      if(key==='m:addcat'&&!willFold){const n=$('newCatName');if(n)n.focus();return}
+      window.scrollTo(0,y);return;
     }
     if(t.dataset.foldall!==undefined){
       const fold=t.dataset.foldall==='1',y=scrollY;
@@ -188,7 +251,9 @@ export function initEvents(){
     const y=scrollY;save();render();if(t.dataset.lvl||t.dataset.bool||t.dataset.skipopen||t.dataset.skipcancel||t.dataset.skipgo||t.dataset.unskip||t.dataset.unfreezeday||t.dataset.freeze||t.dataset.unfreeze)window.scrollTo(0,y)});
 
   $('add').addEventListener('submit',e=>{e.preventDefault();const v=$('name').value.trim();if(!v)return;
-    S.habits.push(newHabit(v));$('name').value='';save();render()});
+    const nh=newHabit(v);S.habits.push(nh);$('name').value='';
+    S.fold=S.fold||{};S.fold['mcat:'+nh.cat]=false;if(nh.grp)S.fold['mgrp:'+nh.grp]=false;
+    save();render()});
   $('cat').addEventListener('change',()=>{S.addGrp='';syncAddGroups()});
 
   document.addEventListener('change',e=>{const t=e.target;
@@ -201,6 +266,8 @@ export function initEvents(){
     }
     if(t.dataset&&t.dataset.assign){(S.assignDraft=S.assignDraft||{})[t.dataset.assign]=t.value}
     else if(t.id==='assignAll'&&t.value){S.assignDraft=S.assignDraft||{};unassigned(S.habits,S.cats).forEach(h=>{S.assignDraft[h.id]=t.value});render()}});
+
+  document.addEventListener('input',e=>{if(e.target.id==='codeEditor'){S.codeDraft=e.target.value;S.codeMsg='Unsaved edits'}});
 
   // Day page: summary and note drafts
   document.addEventListener('input',e=>{
@@ -254,6 +321,8 @@ export function initEvents(){
     if(id==='fqN'||id==='fqPer'){const cur=cleanFreq(h.fq)||{n:3,per:'week'},f=fqFrom(id==='fqN'?e.target.value:cur.n,id==='fqPer'?e.target.value:cur.per);
       if(f&&!h.stop)h.fq=f;save();render();$(id).focus();return}
     if(id==='impIn'){const n=Number(e.target.value);if(n>=1&&n<=5){h.importance=n;save();render();$('impIn').focus()}return}
+    if(id==='rqFrom'){const v=e.target.value;if(/^\d{4}-\d{2}-\d{2}$/.test(v)&&v<=K(T())){S.reqFrom={id:h.id,k:v};render();$('rqFrom').focus()}return}
+    if(id==='rqPer'){const yEl=$('rqY');if(e.target.value==='days'&&!yEl){const x=Number($('rqX')?.value)||3;setReq(h,{x,per:'days',y:Math.max(x,7)},$('rqFrom')?.value||K(T()));save();render();$('rqY')?.focus()}return}
     if(id==='goalFrom'){const v=e.target.value;if(/^\d{4}-\d{2}-\d{2}$/.test(v)&&v<=K(T())){S.goalFrom={id:h.id,k:v};render();$('goalFrom').focus()}return}
     if(id==='moveCat'){if(S.cats.some(c=>c.id===e.target.value)){h.cat=e.target.value;delete h.grp;save();render();$('moveCat').focus()}return}
     if(id==='moveGrp'){const v=e.target.value;if(!v)delete h.grp;else if(S.grps.some(g=>g.id===v&&g.cat===h.cat))h.grp=v;else return;save();render();$('moveGrp').focus();return}

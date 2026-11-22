@@ -42,9 +42,9 @@ function card(h,k,today){
   else{square=sq();cls=' none';
     stat=today?'Not logged yet':h.stop&&h.type==='text'?'No entry · clean day':'Not logged'+(!h.stop?' · 0%':'')}
 
-  const hFold=isFolded('hab:'+h.id,false);
+  const hFold=isFolded('hab:'+h.id,true);
   const hmFold=isFolded('hm:'+h.id,true);
-  const ns=dayNotes(h,k),ntFold=isFolded('nt:'+h.id,ns.length===0);
+  const ns=dayNotes(h,k),ntFold=isFolded('nt:'+h.id,true);
   const dr=dayDraftOf(h,k),smVal=dr&&dr.sum!==undefined?dr.sum:sumOf(h,k);
   const dk=h.id+'|'+k;
   const dirty=(S.draft&&dk in S.draft)||(dr&&(dr.sum!==undefined||Object.keys(dr.v||{}).length>0));
@@ -52,7 +52,7 @@ function card(h,k,today){
   const body=hFold?'':`<div class="dbody">
     <div class="dlog">${logHTML(h,k,false)}</div>
     <div class="dsubfold">
-      <button type="button" class="ftog sm" data-fold="hm:${h.id}" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> Heatmap</button>
+      <button type="button" class="ftog sm" data-fold="hm:${h.id}" aria-expanded="${!hmFold}"><span class="farr" aria-hidden="true">${hmFold?'▸':'▾'}</span> Heatmap</button>
       ${hmFold?'':`<div class="dhm">${heatmap({habits:[h],one:h,size:'medium',full:true})}</div>`}
     </div>
     <div class="dsumbox">
@@ -61,7 +61,7 @@ function card(h,k,today){
     </div>
     <div class="dsubfold">
       <div class="noteshead">
-        <button type="button" class="ftog sm" data-fold="nt:${h.id}" aria-expanded="${!ntFold}"><span>${ntFold?'▸':'▾'}</span> Notes (${ns.length})</button>
+        <button type="button" class="ftog sm" data-fold="nt:${h.id}" aria-expanded="${!ntFold}"><span class="farr" aria-hidden="true">${ntFold?'▸':'▾'}</span> Notes (${ns.length})</button>
         <span class="ntbtns">
           <button type="button" class="btn alt sv" data-dayntadd="${dk}">+ Add note</button>
           ${isManual(h,k)?`<button type="button" class="btn alt sv" data-dayntreset="${dk}">Sort by date</button>`:''}
@@ -78,7 +78,7 @@ function card(h,k,today){
 
   return `<article class="dcard${cls}${hFold?' folded':''}" data-daycard="${h.id}">
     <div class="dchead">
-      <button type="button" class="ftog" data-fold="hab:${h.id}" aria-expanded="${!hFold}" aria-label="${hFold?'Expand':'Fold'} ${esc(h.name)}"><span>${hFold?'▸':'▾'}</span></button>
+      <button type="button" class="ftog" data-fold="hab:${h.id}" aria-expanded="${!hFold}" aria-label="${hFold?'Expand':'Fold'} ${esc(h.name)}"><span class="farr" aria-hidden="true">${hFold?'▸':'▾'}</span></button>
       ${square}
       <div class="dmain">
         <div class="dtop"><a class="name nm" href="${href.habit(h.id)}">${esc(h.name)}</a>${isPeriodic(h)?'<span class="dbadge dper">periodic</span>':''}${pc}</div>
@@ -97,12 +97,12 @@ function dayGroupSection(g,k,today,depth=0){
   if(!allDeep.length)return '';
   const direct=sortByOrder(inGroup(S.habits,g)).filter(h=>shownOnDay(h,k));
   const subs=childGroups(S.grps,g.cat,g.id);
-  const gFold=isFolded('grp:'+g.id,false);
+  const gFold=isFolded('grp:'+g.id,depth>0);
   const dh=daily(allDeep),p=dayPercent(dh,k,today),act=dh.filter(h=>!isOff(h,k)),logged=act.filter(h=>isLogged(h,k)).length;
   const sub=`${logged} of ${act.length} logged${p===null?'':' · '+pctText(p)}`;
   return `<div class="dsubgrp${depth?' nested':''}">
     <div class="dgh">
-      <button type="button" class="ftog" data-fold="grp:${g.id}" aria-expanded="${!gFold}"><span>${gFold?'▸':'▾'}</span> <b>${esc(g.name)}</b></button>
+      <button type="button" class="ftog" data-fold="grp:${g.id}" aria-expanded="${!gFold}"><span class="farr" aria-hidden="true">${gFold?'▸':'▾'}</span> <b>${esc(g.name)}</b></button>
       <span class="dgs">${sub}</span>
     </div>
     ${gFold?'':`<div class="dcards">${direct.map(h=>card(h,k,today)).join('')}</div>${subs.map(sg=>dayGroupSection(sg,k,today,depth+1)).join('')}`}
@@ -119,7 +119,7 @@ function categorySection(c,k,today){
   const topGrps=childGroups(S.grps,c.id,null);
   return `<section class="dgrp" style="--c:${c.color}" aria-labelledby="dg-${c.id}">
     <div class="dgh">
-      <h3 id="dg-${c.id}"><button type="button" class="ftog" data-fold="cat:${c.id}" aria-expanded="${!cFold}"><span>${cFold?'▸':'▾'}</span><span class="cb-icon" aria-hidden="true">${esc(c.icon||'●')}</span>${esc(c.name)}</button></h3>
+      <h3 id="dg-${c.id}"><button type="button" class="ftog" data-fold="cat:${c.id}" aria-expanded="${!cFold}"><span class="farr" aria-hidden="true">${cFold?'▸':'▾'}</span><span class="cb-icon" aria-hidden="true">${esc(c.icon||'●')}</span>${esc(c.name)}</button></h3>
       <span class="dgs">${sub}</span>
     </div>
     ${cFold?'':`${own.length?`<div class="dcards">${own.map(h=>card(h,k,today)).join('')}</div>`:''}${topGrps.map(g=>dayGroupSection(g,k,today,0)).join('')}`}
