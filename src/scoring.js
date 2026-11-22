@@ -141,13 +141,15 @@ export const logPct=(h,v,k)=>h.type==='text'?pctText(v/100):amtPct(h,v,k);
 export const SHORT=[0,.5,1,1.5,2];
 export const shortAmt=(h,m,k=K(T()))=>Math.round(m*goalOn(h,k)*10)/10;
 
-// Clean stepped GitHub-style green scale: 0% = red (gz), (0..50%) = l1, [50..100%) = l2, [100..150%) = l3, >=150% = l4.
-// Above 200% (single habit only): glow (gl), shimmer at 500%+ (gs).
+// Smooth darkening green scale (both light & dark mode):
+// 0% = red (gz), >0% -> 100% = pale green (--g0) -> dark green (--g1), 100% -> 200% = dark green (--g1) -> deep forest (--g2).
+// Above 200% (single habit only): stays deep forest + glow (gl), shimmer at 500%+ (gs).
 export function paint(p,glow=false){
   if(!(p>0))return{cls:'gc gz',style:''};
-  const lvl=p<0.5?'l1':p<1?'l2':p<1.5?'l3':'l4';
-  let cls='gc '+lvl,style='';
-  if(glow&&p>CAP){const w=Math.min(1,(p-CAP)/3);cls+=' gl'+(p>=5?' gs':'');style=`--w:${w.toFixed(2)}`}
+  const s=Math.min(p,CAP);let a='--g0',b='--g1',f=s;
+  if(s>1){a='--g1';b='--g2';f=s-1}
+  let cls='gc',style=`--ga:var(${a});--gb:var(${b});--f:${(f*100).toFixed(1)}%`;
+  if(glow&&p>CAP){const w=Math.min(1,(p-CAP)/3);cls+=' gl'+(p>=5?' gs':'');style+=`;--w:${w.toFixed(2)}`}
   return{cls,style}}
 
 export function setAmt(h,k,v){h.skip=h.skip||{};

@@ -11,7 +11,6 @@ import {href} from './router.js';
 const IMPS=['Minor','Low','Normal','High','Critical'];
 const longDate=d=>d.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const sq=(cls='',style='')=>`<i class="dsw${cls?' '+cls:''}"${style?` style="${style}"`:''} aria-hidden="true"></i>`;
-
 const isFolded=(key,def=false)=>S.fold&&key in S.fold?!!S.fold[key]:def;
 
 function dayDraftOf(h,k){
@@ -90,11 +89,13 @@ function card(h,k,today){
   </article>`;
 }
 
-// Recursive nested group section inside a category on the Day page
+// Show habits that existed on day k and were NOT frozen on day k (so frozen habits behave like archived on frozen days, while past logs remain visible!)
+const shownOnDay=(h,k)=>h.created<=k&&!isFrozen(h,k);
+
 function dayGroupSection(g,k,today,depth=0){
-  const allDeep=inGroupDeep(S.habits,S.grps,g).filter(h=>h.created<=k);
+  const allDeep=inGroupDeep(S.habits,S.grps,g).filter(h=>shownOnDay(h,k));
   if(!allDeep.length)return '';
-  const direct=sortByOrder(inGroup(S.habits,g)).filter(h=>h.created<=k);
+  const direct=sortByOrder(inGroup(S.habits,g)).filter(h=>shownOnDay(h,k));
   const subs=childGroups(S.grps,g.cat,g.id);
   const gFold=isFolded('grp:'+g.id,false);
   const dh=daily(allDeep),p=dayPercent(dh,k,today),act=dh.filter(h=>!isOff(h,k)),logged=act.filter(h=>isLogged(h,k)).length;
@@ -108,9 +109,8 @@ function dayGroupSection(g,k,today,depth=0){
   </div>`;
 }
 
-// One foldable category on the Day page
 function categorySection(c,k,today){
-  const hs=sortByOrder(inCat(S.habits,c.id)).filter(h=>h.created<=k);
+  const hs=sortByOrder(inCat(S.habits,c.id)).filter(h=>shownOnDay(h,k));
   if(!hs.length)return '';
   const dh=daily(hs),pn=periodic(hs).filter(h=>isChecked(h,k)).length,p=dayPercent(dh,k,today),act=dh.filter(h=>!isOff(h,k)),logged=act.filter(h=>isLogged(h,k)).length;
   const sub=[act.length?`${logged} of ${act.length} logged${p===null?'':' · '+pctText(p)}`:'',pn?`${pn} periodic checked`:''].filter(Boolean).join(' · ');

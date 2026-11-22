@@ -1,8 +1,8 @@
-// All user-input wiring: forms, buttons, Day page inline editing & folding, nested groups, hh:mm, theme, sign-in, backup.
+// All user-input wiring: forms, buttons, folding, Statistics presets & habit picker, Day page inline editing, nested groups, hh:mm, theme, sign-in, backup.
 import {S} from './state.js';
 import {$,K,T} from './util.js';
 import {cleanFreq,freqText,freeze,unfreeze,unfreezeDay,setGoal,TYPES,unitType,SHORT,shortAmt,pctOf,paint,logPct,setAmt,cleanHabit,addNote,setNote,delNote,moveNote,resetNoteOrder,pruneEmpty,parseHHMM} from './scoring.js';
-import {render,refreshRange,resetRange} from './render.js';
+import {render,refreshRange,setRangePreset,syncAddGroups} from './render.js';
 import {unassigned,cleanCats,mergeCats,moveCat,renumber,newCatId,cleanGrps,mergeGrps,renumberGrps,moveGrp,newGrpId,childGroups,live} from './categories.js';
 import {hidePop,setMode} from './heatmap.js';
 import {navigate,href} from './router.js';
@@ -74,7 +74,7 @@ const authErr=e=>msg(({'auth/invalid-credential':'Wrong email or password.','aut
 
 export function initEvents(){
   document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;
-    // Day page: fold/unfold any category, group, habit, heatmap, or notes section
+    // Universal fold / expand (Day page, Category, Habit, Home, Statistics)
     if(t.dataset.fold){
       const key=t.dataset.fold,y=scrollY;
       S.fold=S.fold||{};
@@ -89,7 +89,18 @@ export function initEvents(){
       live(S.habits).forEach(h=>{S.fold['hab:'+h.id]=fold;S.fold['hm:'+h.id]=fold;S.fold['nt:'+h.id]=fold});
       render();window.scrollTo(0,y);return;
     }
-    // Day page: save one habit card (amount + summary + notes)
+    // Statistics date presets (All time / Last month)
+    if(t.dataset.rangepreset){
+      const [key,preset]=t.dataset.rangepreset.split('|');
+      setRangePreset(key,preset);return;
+    }
+    // Home Statistics habit selector (All / Clear)
+    if(t.dataset.statpick){
+      const y=scrollY;
+      S.statPick=t.dataset.statpick==='all'?null:[];
+      render();window.scrollTo(0,y);return;
+    }
+    // Day page: save one habit card
     if(t.dataset.daysave){
       const [id,k]=t.dataset.daysave.split('|'),h=S.habits.find(x=>x.id===id),y=scrollY;
       if(h){saveDayCard(h,k);save();render();window.scrollTo(0,y)}return;
@@ -163,7 +174,6 @@ export function initEvents(){
     else if(t.dataset.rm){const h=S.habits.find(x=>x.id===t.dataset.rm);if(!h||!confirm('Delete "'+h.name+'" and all its history forever? This cannot be undone.'))return;
       S.habits=S.habits.filter(x=>x.id!==t.dataset.rm)}
     else if(t.dataset.grptoggle){const id=t.dataset.grptoggle;(S.shut=S.shut||{})[id]=!S.shut[id];save();render();focusSel(`[data-grptoggle="${id}"]`);return}
-    else if(t.dataset.addto){S.addGrp=t.dataset.addto;render();const n=$('name');if(n){n.scrollIntoView({block:'center'});n.focus()}return}
     else if(t.dataset.grpup||t.dataset.grpdown){const id=t.dataset.grpup||t.dataset.grpdown,up=!!t.dataset.grpup;
       S.grps=moveGrp(S.grps,id,up?-1:1);save();render();
       const b=document.querySelector(`[data-grp${up?'up':'down'}="${id}"]:not([disabled])`)||document.querySelector(`[data-grp${up?'down':'up'}="${id}"]`);if(b)b.focus();return}
@@ -175,12 +185,20 @@ export function initEvents(){
     else if(t.dataset.hmode){setMode(t.dataset.hmode);render();
       const b=document.querySelector(`[data-hmode="${t.dataset.hmode}"][data-hmfor="${t.dataset.hmfor}"]`);if(b)b.focus();return}
     else return;
-    const y=scrollY;save();render();if(t.dataset.lvl||t.dataset.bool||t.dataset.skipopen||t.dataset.skipcancel||t.dataset.skipgo||t.dataset.unskip||t.dataset.unfreezeday)window.scrollTo(0,y)});
+    const y=scrollY;save();render();if(t.dataset.lvl||t.dataset.bool||t.dataset.skipopen||t.dataset.skipcancel||t.dataset.skipgo||t.dataset.unskip||t.dataset.unfreezeday||t.dataset.freeze||t.dataset.unfreeze)window.scrollTo(0,y)});
 
   $('add').addEventListener('submit',e=>{e.preventDefault();const v=$('name').value.trim();if(!v)return;
     S.habits.push(newHabit(v));$('name').value='';save();render()});
+  $('cat').addEventListener('change',()=>{S.addGrp='';syncAddGroups()});
 
   document.addEventListener('change',e=>{const t=e.target;
+    if(t.dataset&&t.dataset.statcheck){
+      const id=t.dataset.statcheck,allIds=live(S.habits).map(h=>h.id),y=scrollY;
+      let set=new Set(S.statPick?S.statPick:allIds);
+      if(t.checked)set.add(id);else set.delete(id);
+      S.statPick=set.size===allIds.length?null:[...set];
+      render();window.scrollTo(0,y);return;
+    }
     if(t.dataset&&t.dataset.assign){(S.assignDraft=S.assignDraft||{})[t.dataset.assign]=t.value}
     else if(t.id==='assignAll'&&t.value){S.assignDraft=S.assignDraft||{};unassigned(S.habits,S.cats).forEach(h=>{S.assignDraft[h.id]=t.value});render()}});
 
@@ -216,7 +234,7 @@ export function initEvents(){
     S.cats=renumber([...S.cats,{id:newCatId(),name:name.slice(0,40),color:$('newCatColor').value,icon:$('newCatIcon').value.trim().slice(0,8),order:S.cats.length}]);
     S.catMsg='Added “'+name+'”. It now shows on Home.';save();render();$('newCatName').focus()});
 
-  // Nested groups on Manage page
+  // Nested groups on Edit habits page
   document.addEventListener('submit',e=>{const f=e.target;if(!f.classList||!f.classList.contains('addgrp'))return;e.preventDefault();
     const cat=f.dataset.gcat,inp=f.querySelector('input[name="gname"]')||f.querySelector('input'),name=inp.value.trim();
     if(!name||!S.cats.some(c=>c.id===cat))return;
@@ -262,7 +280,6 @@ export function initEvents(){
     if(/^\d{4}-\d{2}-\d{2}$/.test(v))navigate(href.day(v>today?today:v))});
 
   document.addEventListener('input',e=>{const r=e.target.dataset&&e.target.dataset.range;if(r)refreshRange(r.split('|')[0])});
-  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-rangereset]');if(b)resetRange(b.dataset.rangereset)});
 
   const root=document.documentElement;
   const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
@@ -273,7 +290,6 @@ export function initEvents(){
   $('type').addEventListener('change',syncForm);$('stop').addEventListener('change',syncForm);$('unit').addEventListener('input',()=>{$('goalUnit').textContent=$('unit').value.trim()});syncForm();
   initDrag();
   document.addEventListener('change',e=>{if(e.target.classList&&e.target.classList.contains('skipReason'))e.target.closest('.skippanel').querySelector('input').hidden=e.target.value!=='Other…'});
-  // Enter in #nameIn renames; #sum is now a multi-line textarea so Enter inserts a new line
   document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nameIn'){e.preventDefault();const b=document.querySelector('[data-rename]');if(b)b.click()}});
 
   $('login').addEventListener('submit',e=>{e.preventDefault();msg('');signIn($('email').value,$('pass').value).catch(authErr)});

@@ -1,13 +1,14 @@
-// The Home page: one big heatmap of every habit, then one big button per category.
+// The Home page: foldable combined heatmap, category buttons, "Edit habits" link, and unified foldable Statistics at the bottom.
 import {S} from './state.js';
 import {$,K,T,esc,pct} from './util.js';
 import {todayOf,todayStats,daily,periodic,periodicChecked} from './scoring.js';
 import {live,inCat} from './categories.js';
 import {heatmap,legendHTML,modeSwitch} from './heatmap.js';
+import {statsSection} from './render.js';
 import {href} from './router.js';
 
-// One category button: name, today's progress ("3 of 5"), a thin heat strip of the last 4 weeks, in the category colour.
-// It is a real link (so middle-click, long-press and Back all work) and holds no buttons inside.
+const isFolded=(key,def=false)=>S.fold&&key in S.fold?!!S.fold[key]:def;
+
 function catButton(c){
   const hs=inCat(S.habits,c.id),{done,total}=todayOf(hs),p=pct(done,total),stats=todayStats(hs);
   const prog=total?`<span class="cb-num"><b>${done}</b> check${done===1?'':'s'}</span><span class="cb-lbl">today${stats.length?' · '+stats.join(' · '):''}</span>`
@@ -22,9 +23,12 @@ function catButton(c){
 
 export function renderHome(){
   const H=live(S.habits);
-  $('home').innerHTML=`<section aria-labelledby="homeHeatT"><h2 id="homeHeatT">All habits · 20 weeks</h2>
-    ${modeSwitch(H,'heat')}${heatmap({habits:H,size:'large',id:'heat'})}${legendHTML(periodic(H).length>0)}
-    ${H.length?`<p style="margin:12px 0 0"><a class="btn alt sv" href="${href.day(K(T()))}">See everything you did today</a></p>`:''}
-    ${H.length?'':'<p class="empty" style="margin-top:12px">No habits yet. Open a category below to add your first one.</p>'}</section>
-  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><a class="mlink" href="${href.manage}">Manage categories</a></div>
-  <nav class="cats" aria-labelledby="catsT">${S.cats.map(catButton).join('')}</nav>`}
+  const hmFold=isFolded('home:hm',false);
+  $('home').innerHTML=`<section aria-labelledby="homeHeatT">
+    <div class="sec-hd"><h2 id="homeHeatT"><button type="button" class="ftog" data-fold="home:hm" aria-expanded="${!hmFold}"><span>${hmFold?'▸':'▾'}</span> All habits · 20 weeks</button></h2>
+      ${H.length?`<a class="btn alt sv" href="${href.day(K(T()))}">Edit today</a>`:''}</div>
+    ${hmFold?'':`${modeSwitch(H,'heat')}${heatmap({habits:H,size:'large',id:'heat'})}${legendHTML(periodic(H).length>0)}`}
+    ${H.length?'':'<p class="empty" style="margin-top:12px">No habits yet. Open “Edit habits” below to add your first one.</p>'}</section>
+  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><a class="mlink" href="${href.manage}">Edit habits</a></div>
+  <nav class="cats" aria-labelledby="catsT">${S.cats.map(catButton).join('')}</nav>
+  ${H.length?statsSection('a','all',H):''}`}

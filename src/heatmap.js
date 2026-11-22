@@ -56,7 +56,7 @@ export function heatmap({habits,one=null,size='large',interactive=true,id='',ful
   const grid=`<div class="heat heat-${size==='small'?'sm':size==='medium'?'md':'lg'}"${id?` id="${id}"`:''}${scope?` data-scope="${esc(scope)}"`:''}${st?' aria-hidden="true"':' role="group" aria-label="Heatmap"'}>${cells}</div>`;
   return sm?grid:`<div class="scroll">${grid}</div>`}
 
-export const legendHTML=(periodicToo=false)=>'<div class="legend"><i class="lgr"></i> 0% · <i class="gc l1"></i><i class="gc l2"></i><i class="gc l3"></i><i class="gc l4"></i> &gt;0% → 150%+ · Glow = &gt;200% · <i class="lgm"></i> Not logged · <i class="sksw"></i> Skipped · <i class="icsw"></i> Frozen'+(periodicToo?' · <i class="pmsw"><i class="pmk"></i></i> Periodic checked · <i class="posw"></i> Only periodic':'')+'</div>';
+export const legendHTML=(periodicToo=false)=>'<div class="legend"><i class="lgr"></i> 0% · <i class="gbar"></i> &gt;0% → 100% → 200% (darker = more) · <i class="lgm"></i> Not logged · <i class="sksw"></i> Skipped · <i class="icsw"></i> Frozen'+(periodicToo?' · <i class="pmsw"><i class="pmk"></i></i> Periodic checked · <i class="posw"></i> Only periodic':'')+'</div>';
 
 export function rove(box){if(!box)return;const cells=[...box.querySelectorAll('[data-pk]')];if(!cells.length)return;
   const tgt=box.querySelector('.now')||[...cells].reverse().find(c=>!c.classList.contains('fut'))||cells[0];
