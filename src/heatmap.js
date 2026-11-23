@@ -66,13 +66,13 @@ export function heatmap({habits,one=null,size='large',interactive=true,id='',ful
   const first=dateOf(one?one.created:(habits.map(h=>h.created).sort()[0]||K(P.t)));
   let start,n;
   if(sm){n=STRIP;start=add(P.t,-(STRIP-1))}
-  else{n=W*7;const cur=mondayOf(P.t),wk0=mondayOf(first);start=full||Math.round((cur-wk0)/6048e5)>=W?add(cur,-(W-1)*7):wk0}
+  else{n=W*7;start=add(mondayOf(P.t),-(W-1)*7)}
   const H=one?habits:daily(habits);
   let cells='';for(let i=0;i<n;i++)cells+=cell(add(start,i),first,one,H,P,o);
   const sz=sm?'sm':size==='medium'?'md':'lg';
   const grid=`<div class="heat heat-${sz}"${id?` id="${id}"`:''}${scope?` data-scope="${esc(scope)}"`:''}${st?' aria-hidden="true"':' role="group" aria-label="Heatmap"'}>${cells}</div>`;
   if(sm)return grid;
-  const days='<div class="hdays" aria-hidden="true"><span>M</span><span></span><span>W</span><span></span><span>F</span><span></span><span></span></div>';
+  const days='<div class="hdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>';
   return `<div class="scroll"><div class="hframe hframe-${sz}">${monthAxis(start)}${days}${grid}</div></div>`}
 
 export const legendHTML=(periodicToo=false)=>
@@ -124,7 +124,9 @@ function showPop(c,pin){
   const p=pop.el;p.innerHTML=popHTML(c.dataset.pk,c.dataset.ph,sc);p.hidden=false;
   const r=c.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
   p.style.left=Math.max(8,Math.min(r.left+r.width/2-w/2,innerWidth-w-8))+'px';
-  p.style.top=(r.top-h-8<8?r.bottom+8:r.top-h-8)+'px';
+  const above=r.top-h-8,below=r.bottom+8;
+  const top=above>=8?above:Math.min(below,Math.max(8,innerHeight-h-8));
+  p.style.top=Math.max(8,top)+'px';
   pop.cell=c;pop.pinned=!!pin;pop.key=c.dataset.pk+'|'+c.dataset.ph+'|'+sc}
 export function hidePop(){if(pop.el)pop.el.hidden=true;pop.cell=null;pop.pinned=false;pop.key=''}
 

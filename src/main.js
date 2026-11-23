@@ -14,14 +14,17 @@ initHeatmapEvents();   // popover, hover, keyboard
 // S.keepDay is set when a link asks for a specific day ("Edit this day").
 initRouter(()=>{if($('app').hidden)return;
   if(S.keepDay)S.keepDay=false;else S.day=K(T());
-  S.draft={};S.noteDraft=null;S.skipFor=null;S.delCat=null;S.catMsg='';S.saved=false;render();window.scrollTo(0,0);
+  S.draft={};S.noteDraft=null;S.dayDrafts=null;S.skipFor=null;S.delCat=null;S.catMsg='';
+  S.saved=false;S.daySaved=null;S.reqFrom=null;S.goalFrom=null;S.keepNoteDay=null;S.codeMsg='';
+  render();window.scrollTo(0,0);
   // Screen readers: announce the new page by moving focus to its heading (keyboard users start at the top of the page)
   const hd=document.querySelector('#page .dname,#detail .dname,#home h2');if(hd){hd.tabIndex=-1;hd.focus({preventScroll:true})}});
 
 watchAuth({
   onOut(){$('auth').hidden=false;$('app').hidden=true;$('who').hidden=true},
   onIn(u){$('auth').hidden=true;$('app').hidden=false;$('who').hidden=false;$('mail').textContent=u.email;render()},
-  onRemote(){if(!(document.activeElement&&document.activeElement.tagName==='TEXTAREA'))render()}
+  onRemote(){const tag=document.activeElement&&document.activeElement.tagName;
+    if(tag!=='TEXTAREA'&&tag!=='INPUT'&&tag!=='SELECT')render()}
 });
 
 // Offline / back online: say so, and send everything saved on this device as soon as the connection returns

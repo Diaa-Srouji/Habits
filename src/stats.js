@@ -41,7 +41,7 @@ function clamp(created,from,to){const t=T(),c=dateOf(created),a=dateOf(from),b=d
 export function habitStats(h,from,to){
   if(isPeriodic(h))return periodicStats(h,from,to);
   const tk=K(T()),[a,b]=clamp(h.created,from,to);
-  const r={from:a,to:b,kind:h.type==='text'?(h.stop?'stopbool':'text'):h.stop?(h.type==='bool'?'stopbool':'stop'):h.type==='bool'?'bool':'amount',
+  const r={from:K(a),to:K(b),kind:h.type==='text'?(h.stop?'stopbool':'text'):h.stop?(h.type==='bool'?'stopbool':'stop'):h.type==='bool'?'bool':'amount',
     days:0,frozen:0,skipped:0,logged:0,counted:0,zero:0,pos:0,p50:0,p100:0,p200:0,done:0,missed:0,stopped:0,over:0,atZero:0,sum:0,best:0,saved:0,streak:0};
   let run=0;
   for(let d=a;d<=b;d=add(d,1)){const k=K(d);
@@ -67,7 +67,7 @@ export function habitStats(h,from,to){
 // (a checked day = something above 0 logged). r.logged = checked days, r.pos = the same, r.done = checked days of a True / false habit.
 function periodicStats(h,from,to){
   const [a,b]=clamp(h.created,from,to);
-  const r={from:a,to:b,kind:h.type==='bool'?'pbool':h.type==='text'?'ptext':'pnum',
+  const r={from:K(a),to:K(b),kind:h.type==='bool'?'pbool':h.type==='text'?'ptext':'pnum',
     days:0,frozen:0,skipped:0,logged:0,counted:0,zero:0,pos:0,p50:0,p100:0,p200:0,done:0,missed:0,stopped:0,over:0,atZero:0,sum:0,best:0,saved:0,streak:0};
   for(let d=a;d<=b;d=add(d,1)){const k=K(d);
     if(isFrozen(h,k)){r.frozen++;continue}
@@ -90,7 +90,7 @@ const rate=(a,b)=>a+b?Math.round(a/(a+b)*100)+'%':'–';
 // Tiles for one habit: [label, value, optional class]. Values are already safe to put in HTML.
 export function habitRows(h,r){
   const rows=_habitRows(h,r);
-  if(reqHistory(h).length&&r.from&&r.to){const ps=reqPeriods(h,r.to).filter(p=>p.complete&&p.end>=r.from);if(ps.length)rows.push(['Periods well done',ps.filter(p=>p.wellDone).length+' / '+ps.length])}
+  if(reqHistory(h).length&&r.from&&r.to&&r.from<=r.to){const ps=reqPeriods(h,r.to).filter(p=>p.complete&&p.end>=r.from);if(ps.length)rows.push(['Periods well done',ps.filter(p=>p.wellDone).length+' / '+ps.length])}
   return rows}
 function _habitRows(h,r){
   const rows=[['Total days',r.days],['Frozen days',r.frozen,'ice'],['Skipped days',r.skipped]],streak=['Longest streak',plural(r.streak,'day')];

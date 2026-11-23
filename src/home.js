@@ -5,6 +5,7 @@ import {todayOf,todayStats,daily,periodic,periodicChecked} from './scoring.js';
 import {live,inCat} from './categories.js';
 import {heatmap,legendHTML,modeSwitch} from './heatmap.js';
 import {statsSection} from './render.js';
+import {allDaysSection} from './day.js';
 import {href} from './router.js';
 
 const isFolded=(key,def=false)=>S.fold&&key in S.fold?!!S.fold[key]:def;
@@ -29,6 +30,7 @@ export function renderHome(){
       ${H.length?`<a class="btn alt sv" href="${href.day(K(T()))}">Edit today</a>`:''}</div>
     ${hmFold?'':`${modeSwitch(H,'heat')}${heatmap({habits:H,size:'large',id:'heat'})}${legendHTML(periodic(H).length>0)}`}
     ${H.length?'':'<p class="empty" style="margin-top:12px">No habits yet. Open “Edit habits” below to add your first one.</p>'}</section>
-  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><span class="hlinks"><a class="mlink" href="${href.code}">Code DB</a> · <a class="mlink" href="${href.manage}">Edit habits</a></span></div>
+  <div class="sech-row"><h2 class="sech" id="catsT">Categories</h2><span class="hlinks"><a class="mlink" href="${href.code}">Text DB</a> · <a class="mlink" href="${href.manage}">Edit habits</a></span></div>
   <nav class="cats" aria-labelledby="catsT">${S.cats.map(catButton).join('')}</nav>
+  ${H.length?allDaysSection('a','all',H):''}
   ${H.length?statsSection('a','all',H):''}`}

@@ -22,7 +22,7 @@ export const live=habits=>habits.filter(h=>!h.archived);
 export const inCat=(habits,id)=>habits.filter(h=>h.cat===id&&!h.archived);
 export const PALETTE=['#2F7BEA','#E8772B','#1A9850','#B83DBA','#10B5C9','#D9A400','#E0334C','#6C4FE0'];
 export const nextColor=cats=>PALETTE.find(c=>!cats.some(x=>x.color.toLowerCase()===c.toLowerCase()))||PALETTE[cats.length%PALETTE.length];
-export const newCatId=()=>'c'+Date.now().toString(36);
+export const newCatId=()=>'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,4);
 export const renumber=cats=>cats.map((c,i)=>({...c,order:i}));
 export function moveCat(cats,id,dir){const i=cats.findIndex(c=>c.id===id),j=i+dir;
   if(i<0||j<0||j>=cats.length)return cats;const a=cats.slice();[a[i],a[j]]=[a[j],a[i]];return renumber(a)}

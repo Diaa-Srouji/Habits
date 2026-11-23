@@ -2,12 +2,12 @@
 import {S} from './state.js';
 import {$,K,T,esc,fmt,pct} from './util.js';
 import {isOff,isFrozen,isFrozenNow,freezeState,extendFreeze,streak,best,count,span,todayOf,typeLabel,periods,norm,SHORT,shortAmt,pctOf,pctText,amtPct,paint,imp,goalOn,goalVal,goalHistory,needsGoalLog,sumOf,dayNotes,isManual,pruneEmpty,textDays,sortByOrder,isPeriodic,freqText,daily,periodic,cleanFreq,fmtHHMM,reqHistory,reqOn,reqText,reqStreaks} from './scoring.js';
-import {exportCodeDB} from './codedb.js';
+import {exportCodeDB,exportCategoryText,exportHabitText} from './codedb.js';
 import {heatmap,legendHTML,hidePop,rove,modeSwitch} from './heatmap.js';
 import {live,unassigned,inCat,inGroup,inGroupDeep,loose,childGroups,groupTreeList,groupPath,nextColor} from './categories.js';
 import {parseHash,href} from './router.js';
 import {renderHome} from './home.js';
-import {renderDay} from './day.js';
+import {renderDay,allDaysSection} from './day.js';
 import {save} from './sync.js';
 import {habitStats,habitRows,categoryStats,categoryRows,startOf,rangeDefault,checkRange} from './stats.js';
 
@@ -75,7 +75,8 @@ function statHTML(hs,sc,from,to){
 function selectedHomeHabits(){
   const all=live(S.habits);
   if(!S.statPick)return all;
-  return all.filter(h=>S.statPick.includes(h.id));
+  const set=new Set(S.statPick);
+  return all.filter(h=>set.has(h.id));
 }
 function statTarget(key){
   const i=key.indexOf(':'),sc=key.slice(0,i),id=key.slice(i+1);
@@ -120,12 +121,12 @@ export function statsSection(sc,id,hs){
   const {mode,from,to}=rangeOf(key,targetHs.length?targetHs:hs);
   const tid='stT-'+esc(id),foldKey='st:'+key,folded=isFolded(foldKey,true);
   const allLive=sc==='a'?live(S.habits):[];
-  const allPicked=!S.statPick;
+  const allPicked=!S.statPick||(allLive.length>0&&targetHs.length===allLive.length);
   const picker=sc==='a'?`<div class="stpick">
     <div class="stpick-bar">
       <span class="stpick-lbl">Habits:</span>
       <button type="button" class="stchip" data-statpick="all" aria-pressed="${allPicked}">All (${allLive.length})</button>
-      <button type="button" class="stchip" data-statpick="none" aria-pressed="${!allPicked&&S.statPick.length===0}">Clear</button>
+      <button type="button" class="stchip" data-statpick="none" aria-pressed="${!allPicked&&targetHs.length===0}">Clear</button>
     </div>
     <div class="stpick-list">${allLive.map(h=>{
       const on=allPicked||S.statPick.includes(h.id);
@@ -158,12 +159,12 @@ const goalText=h=>h.type==='bool'?(h.stop?'Goal: avoid it every day':'Goal: do i
 const kindName=h=>h.type==='bool'?'True / false':h.type==='text'?'Text':h.type==='min'?'Time (hh:mm)':'Number';
 const gripIcon='<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" focusable="false"><circle cx="2.5" cy="3" r="1.5"/><circle cx="7.5" cy="3" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13" r="1.5"/><circle cx="7.5" cy="13" r="1.5"/></svg>';
 
-function habitBlock(h,P,o){
-  const k=K(P.t),sm=sumOf(h,k),ph='<div class="line ph" aria-hidden="true">&nbsp;</div>';
+function habitBlock(h,P){
+  const k=K(P.t),sm=sumOf(h,k);
   const folded=isFolded('blk:'+h.id,true);
   const slot=`<div class="logrow">Today ${logHTML(h,k)}</div>`;
-  const desc=o.desc?(h.desc?`<div class="line desc" title="${esc(h.desc)}">${esc(h.desc)}</div>`:ph):'';
-  const sum=o.sum?(h.type!=='text'&&sm?`<div class="line sumline" title="${esc(sm)}"><span class="sumlbl">What you did:</span> ${esc(sm)}</div>`:ph):'';
+  const desc=h.desc?`<div class="line desc" title="${esc(h.desc)}">${esc(h.desc)}</div>`:'';
+  const sum=h.type!=='text'&&sm?`<div class="line sumline" title="${esc(sm)}"><span class="sumlbl">What you did:</span> ${esc(sm)}</div>`:'';
   let mini='';
   if(folded){
     const off=isOff(h,k),lg=!off&&(h.done[k]>0||!!(h.skip||{})[k]);
@@ -194,7 +195,7 @@ function progressHTML(hs,color,P){const t=todayOf(hs),dh=daily(hs);
   const stats=[['Today',pct(t.done,t.total),t.done+' of '+t.total+' habits'],['This week',pct(wkDone,wkDen),wkDone+' of '+wkDen+' check-ins'],['This month',pct(moDone,moDen),moDone+' of '+moDen+' check-ins']];
   return `<div class="sum">${stats.map(x=>`<div><span>${x[0]}</span><b>${x[1]}%</b><span>${hs.length?x[2]:'No habits yet'}</span><div class="bar"><i style="width:${x[1]}%;background:${color}"></i></div></div>`).join('')}</div>`}
 
-const blocksHTML=(hs,P,color)=>`<div class="blocks" style="--c:${color}">${hs.map(h=>habitBlock(h,P,{desc:hs.some(x=>x.desc),sum:hs.some(x=>x.type!=='text'&&sumOf(x,K(P.t)))})).join('')}</div>`;
+const blocksHTML=(hs,P,color)=>`<div class="blocks" style="--c:${color}">${hs.map(h=>habitBlock(h,P)).join('')}</div>`;
 
 // Recursive nested group card: active (non-frozen) habits shown in blocks; all (including frozen) kept in heatmap & stats at the bottom
 function groupCard(g,c,P,depth=0){
@@ -209,6 +210,7 @@ function groupCard(g,c,P,depth=0){
     ${directActive.length?blocksHTML(directActive,P,c.color):''}
     ${subs.map(sg=>groupCard(sg,c,P,depth+1)).join('')}
     ${deep.length||subs.length?'':'<section><p class="empty">No active habits in this group. Add or unfreeze habits in <a href="'+href.manage+'">Edit habits</a>.</p></section>'}
+    ${deep.length?allDaysSection('g',g.id,deep):''}
     ${deep.length?statsSection('g',g.id,deep):''}
   </div>`:'';
   return `<div class="grp${depth?' sub':''}" style="--c:${c.color}">
@@ -227,6 +229,8 @@ function renderCategory(c){
   ${ownActive.length?blocksHTML(ownActive,P,c.color):''}
   ${topGs.map(g=>groupCard(g,c,P,0)).join('')}
   ${ownActive.length||topGs.length?'':`<section><p class="empty">No active habits here. Go to <a href="${href.manage}">Edit habits</a> to add or unfreeze habits.</p></section>`}
+  ${hs.length?allDaysSection('c',c.id,hs):''}
+  ${textEditorSection('c',c.id,c)}
   ${hs.length?statsSection('c',c.id,hs):''}`;
 }
 
@@ -241,11 +245,11 @@ export function syncAddGroups(){
 
 function manageHabitRow(h){
   const st=freezeState(h),frz=isFrozenNow(h);
-  const meta=[kindName(h),h.type==='bool'||h.type==='text'?'':goalVal(h),isPeriodic(h)?freqText(h):''].filter(Boolean).join(' · ');
+  const meta=[esc(kindName(h)),h.type==='bool'||h.type==='text'?'':goalVal(h),isPeriodic(h)?esc(freqText(h)):''].filter(Boolean).join(' · ');
   return `<div class="mhab${frz?' is-frz':''}">
     <div class="mhab-main">
       <a class="mhab-name" href="${href.habit(h.id)}">${esc(h.name)}</a>
-      <span class="mhab-meta">${esc(meta)}</span>
+      <span class="mhab-meta">${meta}</span>
       ${frz?'<span class="mpill ice">❄ Frozen</span>':st.pending?'<span class="mpill ice">❄ Tomorrow</span>':''}
     </div>
     <div class="mhab-act">
@@ -394,15 +398,25 @@ function renderManage(){
 }
 
 function reqBadgeHTML(h){
-  const rs=reqStreaks(h);if(!rs||!rs.current)return '';
-  const c=rs.current;
-  if(c.skipped)return `<span class="kchip rq-skip" title="Skipped: ${esc(c.skipReason)}">Req skipped</span>`;
-  if(c.wellDone)return `<span class="kchip rq-ok">Well done ✓ (${c.done}/${c.req.x})</span>`;
-  return `<span class="kchip rq-prog">Req: ${c.done}/${c.req.x}</span>`;
+  const rs=reqStreaks(h);if(!rs)return '';
+  if(rs.current){
+    const c=rs.current;
+    if(c.skipped)return `<span class="kchip rq-skip" title="Skipped: ${esc(c.skipReason)}">Req skipped</span>`;
+    if(c.wellDone)return `<span class="kchip rq-ok">Well done ✓ (${c.done}/${c.req.x})</span>`;
+    return `<span class="kchip rq-prog">Req: ${c.done}/${c.req.x}</span>`;
+  }
+  if(rs.pendingStart&&rs.activeReq){
+    return `<span class="kchip rq-prog">Req: ${esc(reqText(rs.activeReq))} · starts ${esc(fmt(rs.pendingStart))}</span>`;
+  }
+  return '';
 }
 
 function reqSectionHTML(h){
   const rs=reqStreaks(h);if(!rs)return '';
+  if(!rs.periods.length){
+    if(!rs.pendingStart||!rs.activeReq)return '';
+    return `<div class="rqbox"><div class="rqstreaks"><span class="rqst">Required: <b>${esc(reqText(rs.activeReq))}</b> · first full period starts <b>${esc(fmt(rs.pendingStart))}</b></span></div></div>`;
+  }
   const foldKey='hrq:'+h.id,folded=isFolded(foldKey,true);
   const recent=[...rs.periods].reverse().slice(0,12);
   const rows=recent.map(p=>{
@@ -420,6 +434,7 @@ function reqSectionHTML(h){
       <span class="rqst">Done-days streak: <b>${rs.doneDays}</b> day${rs.doneDays===1?'':'s'}</span>
       <span class="rqst">All-days streak: <b>${rs.allDays}</b> day${rs.allDays===1?'':'s'}</span>
       ${rs.totalComplete?`<span class="rqst">Well done: <b>${rs.wellDoneCount}/${rs.totalComplete}</b> periods</span>`:''}
+      ${rs.pendingStart&&rs.activeReq?`<span class="rqst">Next (${esc(reqText(rs.activeReq))}) starts <b>${esc(fmt(rs.pendingStart))}</b></span>`:''}
     </div>
     <div class="sec-hd" style="margin:8px 0 4px">
       <button type="button" class="ftog sm" data-fold="${foldKey}" aria-expanded="${!folded}"><span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span> Required periods &amp; Skip req (${rs.periods.length})</button>
@@ -428,21 +443,44 @@ function reqSectionHTML(h){
   </div>`;
 }
 
+function textEditorSection(scope,id,obj){
+  const tKey=scope+':'+id,foldKey='txt:'+tKey,folded=isFolded(foldKey,true);
+  const dr=(S.txtDraft&&S.txtDraft[tKey])||null;
+  const text=dr&&dr.text!==undefined?dr.text:(scope==='h'?exportHabitText(obj,S):exportCategoryText(obj,S));
+  const errs=(dr&&dr.errors)||[];
+  const msg=(dr&&dr.msg)||'';
+  const tid='txtT-'+esc(id);
+  return `<section class="txted-sec" aria-labelledby="${tid}">
+    <div class="sec-hd" style="margin-bottom:${folded?'0':'8px'}">
+      <h2 id="${tid}"><button type="button" class="ftog" data-fold="${foldKey}" aria-expanded="${!folded}"><span class="farr" aria-hidden="true">${folded?'▸':'▾'}</span> Edit as text</button></h2>
+      ${folded?'<span class="hint" style="margin:0">Plain English logs &amp; properties</span>':''}
+    </div>
+    ${folded?'':`<p class="hint" style="margin-top:0">Edit properties and logs (newest first) in plain text. Use <code>—</code>, <code>--</code>, or <code>|</code> before notes.</p>
+    <div class="dayrow">
+      <button type="button" class="btn sv" data-txtapply="${tKey}">Apply &amp; Sync</button>
+      <button type="button" class="btn alt sv" data-txtreset="${tKey}">Reset</button>
+      <span class="uns" role="status">${esc(msg)}</span>
+    </div>
+    ${errs.length?`<div class="codeerr" role="alert"><b>Fix ${errs.length} error${errs.length===1?'':'s'} before saving:</b><ul>${errs.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>`:''}
+    <textarea class="codeed inline" data-txted="${tKey}" spellcheck="false" aria-label="Edit as plain text">${esc(text)}</textarea>`}
+  </section>`;
+}
+
 function renderCode(){
   const text=S.codeDraft!==undefined&&S.codeDraft!==null?S.codeDraft:exportCodeDB(S);
   const errs=S.codeErrors||[];
   const msg=S.codeMsg||'';
-  $('page').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span><span aria-current="page">Code DB</span></nav>
-  <h2 class="dname">Code DB</h2>
+  $('page').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span><span aria-current="page">Text DB</span></nav>
+  <h2 class="dname">Text DB</h2>
   <section class="codedb-sec">
-    <p class="hint">Edit your entire database as plain text (Minimal YAML-like). Latest dates are at the top; config is at the bottom. Nothing is saved if there is a syntax error.</p>
+    <p class="hint">Edit your entire database in plain, readable English. Logs are at the top (newest first), followed by Categories and Habits. Nothing is saved if there is an error.</p>
     <div class="dayrow">
       <button type="button" class="btn" data-codeapply="1">Apply &amp; Sync</button>
       <button type="button" class="btn alt sv" data-codereset="1">Reset to current DB</button>
       <span class="uns" role="status">${esc(msg)}</span>
     </div>
     ${errs.length?`<div class="codeerr" role="alert"><b>Fix ${errs.length} error${errs.length===1?'':'s'} before saving:</b><ul>${errs.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>`:''}
-    <textarea id="codeEditor" class="codeed" spellcheck="false" aria-label="Habit tracker code database">${esc(text)}</textarea>
+    <textarea id="codeEditor" class="codeed" spellcheck="false" aria-label="Habit tracker text database">${esc(text)}</textarea>
   </section>`;
 }
 
@@ -451,7 +489,7 @@ function renderMissing(what){
 
 function renderMain(){
   const R=parseHash(),legacy=S.habits.some(h=>h.notes&&Object.keys(h.notes).length),needGl=S.habits.some(needsGoalLog),countNts=()=>S.habits.reduce((a,h)=>a+Object.keys(h.nts||{}).length,0),n0=countNts();
-  S.habits.forEach(h=>{norm(h);pruneEmpty(h,R.name==='habit'&&R.id===h.id?S.day:R.name==='day'?R.id:null)});
+  S.habits.forEach(h=>{norm(h);pruneEmpty(h,S.keepNoteDay||(R.name==='habit'&&R.id===h.id?S.day:R.name==='day'?R.id:null))});
   const fz=S.habits.reduce((a,h)=>extendFreeze(h)||a,false);
   if(legacy||countNts()!==n0||fz||needGl)save();
   const P=periods(),H=S.habits,need=unassigned(H,S.cats);
@@ -464,7 +502,7 @@ function renderMain(){
     if(h){S.open=h.id;document.title=h.name+' · Habit tracker';renderDetail(h);show('detail')}
     else{renderMissing('Habit');show('page')}}
   else if(R.name==='manage'){document.title='Edit habits · Habit tracker';renderManage();if(!isFolded('m:add',true))show('page','add');else show('page')}
-  else if(R.name==='code'){document.title='Code DB · Habit tracker';renderCode();show('page')}
+  else if(R.name==='code'){document.title='Text DB · Habit tracker';renderCode();show('page')}
   else if(R.name==='day'){if(!renderDay(R.id))renderMissing('Day');show('page')}
   else if(R.name==='cat'){const c=S.cats.find(x=>x.id===R.id);
     if(c){document.title=c.name+' · Habit tracker';renderCategory(c);show('page')}
@@ -511,7 +549,7 @@ function renderDetail(h){
       <input type="number" id="rqX" min="1" max="365" value="${curR?curR.x:''}" placeholder="X" style="width:64px" aria-label="Required days X">
       <span class="hint" style="margin:0">/</span>
       <select id="rqPer" aria-label="Required period"><option value=""${!curR?' selected':''}>None</option><option value="week"${curR&&curR.per==='week'?' selected':''}>week</option><option value="month"${curR&&curR.per==='month'?' selected':''}>month</option><option value="days"${curR&&curR.per==='days'?' selected':''}>Y days</option></select>
-      ${curR&&curR.per==='days'?`<input type="number" id="rqY" min="1" max="365" value="${curR.y}" placeholder="Y" style="width:64px" aria-label="Period length Y days">`:''}
+      <input type="number" id="rqY" min="1" max="365" value="${curR&&curR.per==='days'?curR.y:7}" placeholder="Y" style="width:64px" aria-label="Period length Y days"${curR&&curR.per==='days'?'':' hidden'}>
       <span class="hint" style="margin:0">from</span>
       <input type="date" id="rqFrom" value="${rf}" min="${h.created}" max="${t}" aria-label="Required days from">
       <button type="button" class="btn alt sv" data-rqsave="1">Set</button>
@@ -526,7 +564,7 @@ function renderDetail(h){
 
   $('detail').innerHTML=`<nav class="crumb" aria-label="Breadcrumb"><a href="${href.home}">Home</a><span aria-hidden="true">›</span>${cat?`<a href="${href.cat(cat.id)}">${esc(cat.name)}</a><span aria-hidden="true">›</span>`:''}<span aria-current="page">${esc(h.name)}</span></nav>
   <h2 class="dname">${esc(h.name)}</h2>
-  <div class="meta">${streakHTML(h)}<span>${isPeriodic(h)?'Checked':'Done'} <b>${Object.keys(h.done).length}</b> days</span>${isPeriodic(h)?`<span class="kchip per">${esc(freqText(h))}</span>`:''}</div>
+  <div class="meta">${streakHTML(h)}<span>${isPeriodic(h)?'Checked':'Done'} <b>${Object.keys(h.done).length}</b> days</span>${isPeriodic(h)?`<span class="kchip per">${esc(freqText(h))}</span>`:''}${reqBadgeHTML(h)}</div>
   ${reqSectionHTML(h)}
   ${frzBanner(h)}
   ${h.archived?`<div class="archbanner" role="status"><span>Archived</span><button class="btn sv" data-restore="${h.id}">Restore</button></div>`:''}
@@ -544,12 +582,15 @@ function renderDetail(h){
   ${ns.length?`<ul class="ntrows">${ns.map((n,i)=>noteRow(n,i,ns.length,dr&&dr.v&&dr.v[n.id]!==undefined?dr.v[n.id]:n.t)).join('')}</ul>`:'<p class="empty" style="margin-bottom:12px">No notes for this day.</p>'}
   <div class="dayrow"><button class="btn" data-saveday="1">Save day</button><span id="savestate" role="status">${S.saved?'Saved ✓':''}</span></div>`}
 
+  ${allDaysSection('h',h.id,[h])}
+
   <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="hpr:${h.id}" aria-expanded="${!prFold}"><span class="farr" aria-hidden="true">${prFold?'▸':'▾'}</span> Properties</button></h2></div>
   ${prFold?'':propsTable}
 
   <div class="sec-hd" style="margin-top:18px"><h2><button type="button" class="ftog" data-fold="han:${h.id}" aria-expanded="${!anFold}"><span class="farr" aria-hidden="true">${anFold?'▸':'▾'}</span> All notes</button></h2></div>
   ${anFold?'':'<div id="notelist"></div>'}
 
+  ${textEditorSection('h',h.id,h)}
   ${statsSection('h',h.id,[h])}`;
   if(!anFold)renderNotes(h)}
 

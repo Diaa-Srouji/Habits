@@ -8,7 +8,8 @@ export const fmtHHMM=m=>{const t=Math.max(0,Math.round(Number(m)||0));return Str
 export function parseHHMM(s){
   const t=String(s==null?'':s).trim();if(!t)return null;
   if(t.includes(':')){const parts=t.split(':');if(parts.length!==2)return null;
-    const h=Number(parts[0]),m=Number(parts[1]);
+    const hs=parts[0].trim(),ms=parts[1].trim();if(!hs||!ms)return null;
+    const h=Number(hs),m=Number(ms);
     if(!Number.isFinite(h)||!Number.isFinite(m)||h<0||m<0)return null;
     return h*60+m}
   const n=Number(t);return Number.isFinite(n)&&n>=0?n:null}
@@ -51,24 +52,32 @@ export const goalVal=(h,k)=>h.type==='min'?fmtHHMM(goalOn(h,k)):goalOn(h,k)+(h.u
 
 
 // ---- Time-varying Required Days (rq) & Skip req (rqs) ----
-// rq: { "YYYY-MM-DD": { x: number, per: "week"|"month"|"days", y?: number } }
+// rq: { "YYYY-MM-DD": { x: number, per: "week"|"month"|"days", y?: number } | { per: "none" } }
 // rqs: { "<periodKey>": "<reason>" }  where periodKey is w:YYYY-MM-DD, m:YYYY-MM, or d:YYYY-MM-DD:Y
 export function cleanReq(r){
   if(!r||typeof r!=='object'||Array.isArray(r))return undefined;
-  const per=r.per;if(!['week','month','days'].includes(per))return undefined;
+  const per=r.per;
+  if(per==='none')return{per:'none'};
+  if(!['week','month','days'].includes(per))return undefined;
   const x=Math.round(Number(r.x));if(!Number.isFinite(x)||x<1)return undefined;
   if(per==='week'){if(x>7)return undefined;return{x,per}}
   if(per==='month'){if(x>31)return undefined;return{x,per}}
   const y=Math.round(Number(r.y));if(!Number.isFinite(y)||y<1||y>365||x>y)return undefined;
   return{x,per:'days',y}}
 
+const sameReq=(a,b)=>!!a&&!!b&&a.per===b.per&&a.x===b.x&&a.y===b.y;
 export const reqHistory=h=>Object.keys(h.rq||{}).filter(d=>DK.test(d)&&!!cleanReq(h.rq[d])).sort().map(d=>[d,cleanReq(h.rq[d])]);
 export function reqOn(h,k=K(T())){const hist=reqHistory(h);if(!hist.length)return null;
-  let cur=null;for(const [d,v] of hist){if(d<=k)cur=v;else break}return cur}
+  let cur=null;for(const [d,v] of hist){if(d<=k)cur=v;else break}
+  return cur&&cur.per!=='none'?cur:null}
 export function setReq(h,req,from=K(T())){const c=cleanReq(req),t=K(T());if(!c||!DK.test(from))return false;
-  if(from>t)from=t;h.rq=h.rq||{};h.rq[from]=c;return true}
+  if(from>t)from=t;h.rq=h.rq||{};h.rq[from]=c;
+  const hist=reqHistory(h),i=hist.findIndex(x=>x[0]===from);
+  if(i>0&&sameReq(hist[i-1][1],c))delete h.rq[from];
+  else if(i===0&&c.per==='none')delete h.rq[from];
+  return true}
 export function delReq(h,from){if(h.rq&&from in h.rq){delete h.rq[from];return true}return false}
-export const reqText=r=>{const c=cleanReq(r);if(!c)return '';return c.per==='days'?`${c.x}/${c.y} days`:`${c.x}/${c.per}`};
+export const reqText=r=>{const c=cleanReq(r);if(!c)return '';if(c.per==='none')return 'Off';return c.per==='days'?`${c.x}/${c.y} days`:`${c.x}/${c.per}`};
 export function skipReqPeriod(h,pKey,reason='Skipped'){if(!pKey)return false;h.rqs=h.rqs||{};h.rqs[pKey]=String(reason||'Skipped').trim().slice(0,60)||'Skipped';return true}
 export function unskipReqPeriod(h,pKey){if(h.rqs&&pKey in h.rqs){delete h.rqs[pKey];return true}return false}
 
@@ -79,8 +88,21 @@ export function reqPeriods(h,toKey=K(T())){
   const hist=reqHistory(h);if(!hist.length)return[];
   const out=[],toD=dateOf(toKey);
   const countDone=(s,e)=>{let n=0;for(let d=dateOf(s);d<=dateOf(e);d=add(d,1))if(reqDoneDay(h,K(d)))n++;return n};
+  const remDays=(s,e)=>{
+    let r=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
+    if(s<=toKey&&toKey<=e&&!reqDoneDay(h,toKey)&&!isOff(h,toKey))r++;
+    return r;
+  };
+  const pushPeriod=(key,s,e,req)=>{
+    const capEnd=e>toKey?toKey:e;
+    const done=countDone(s,capEnd);
+    const rem=remDays(s,e);
+    const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
+    out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<toKey,canStillMeet:done+rem>=req.x});
+  };
   for(let i=0;i<hist.length;i++){
     const [startStr,req]=hist[i];
+    if(req.per==='none')continue;
     const nextStr=hist[i+1]?hist[i+1][0]:null;
     const segEnd=nextStr?add(dateOf(nextStr),-1):toD;
     if(segEnd<dateOf(startStr))continue;
@@ -90,12 +112,7 @@ export function reqPeriods(h,toKey=K(T())){
       while(wStart<=segEnd&&wStart<=toD){
         const wEnd=add(wStart,6),s=K(wStart),e=K(wEnd),key='w:'+s;
         if(nextStr&&e>=nextStr)break;
-        const complete=e<toKey||(e===toKey);
-        const capEnd=e>toKey?toKey:e;
-        const done=countDone(s,capEnd);
-        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
-        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
-        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        pushPeriod(key,s,e,req);
         wStart=add(wStart,7);
       }
     }else if(req.per==='month'){
@@ -107,11 +124,7 @@ export function reqPeriods(h,toKey=K(T())){
         if(mStart>segEnd||mStart>toD)break;
         const s=K(mStart),e=K(mEnd),key='m:'+s.slice(0,7);
         if(nextStr&&e>=nextStr)break;
-        const capEnd=e>toKey?toKey:e;
-        const done=countDone(s,capEnd);
-        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
-        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
-        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        pushPeriod(key,s,e,req);
         m++;if(m>11){m=0;y++}
       }
     }else{
@@ -120,11 +133,7 @@ export function reqPeriods(h,toKey=K(T())){
       while(bStart<=segEnd&&bStart<=toD){
         const bEnd=add(bStart,req.y-1),s=K(bStart),e=K(bEnd),key=`d:${s}:${req.y}`;
         if(nextStr&&e>=nextStr)break;
-        const capEnd=e>toKey?toKey:e;
-        const done=countDone(s,capEnd);
-        const rem=e>toKey?Math.round((dateOf(e)-dateOf(toKey))/864e5):0;
-        const skipped=!!(h.rqs&&h.rqs[key]!==undefined);
-        out.push({key,start:s,end:e,req,done,wellDone:done>=req.x,skipped,skipReason:skipped?h.rqs[key]:'',complete:e<=toKey,canStillMeet:done+rem>=req.x});
+        pushPeriod(key,s,e,req);
         bStart=add(bStart,req.y);
       }
     }
@@ -132,15 +141,38 @@ export function reqPeriods(h,toKey=K(T())){
   return out;
 }
 
+// First full period start date for an active req entry when no period has begun yet
+function nextFullStart(startStr,req){
+  if(req.per==='week'){
+    let w=mondayOf(dateOf(startStr));
+    if(K(w)<startStr)w=add(w,7);
+    return K(w);
+  }
+  if(req.per==='month'){
+    const d=dateOf(startStr);
+    let y=d.getFullYear(),m=d.getMonth();
+    if(d.getDate()>1){m++;if(m>11){m=0;y++}}
+    return K(new Date(y,m,1));
+  }
+  return startStr;
+}
+
 // Two req-based streaks:
 // 1) doneDays: total >0 days in the current unbroken run of req-meeting/skipped periods (+ current in-progress period)
 // 2) allDays: total calendar days from the start of that unbroken run up to today
 export function reqStreaks(h,toKey=K(T())){
+  const hist=reqHistory(h);if(!hist.length)return null;
   const ps=reqPeriods(h,toKey);
-  if(!ps.length)return null;
+  const activeReq=reqOn(h,toKey);
+  if(!ps.length){
+    if(!activeReq)return null;
+    const last=hist.filter(([d])=>d<=toKey).pop();
+    return{doneDays:0,allDays:0,current:null,periods:[],wellDoneCount:0,totalComplete:0,activeReq,pendingStart:last?nextFullStart(last[0],activeReq):null};
+  }
   const completed=ps.filter(p=>p.complete);
   const wellDoneCount=completed.filter(p=>p.wellDone).length;
-  const current=ps[ps.length-1];
+  const lastP=ps[ps.length-1];
+  const current=activeReq&&lastP.end>=toKey?lastP:null;
   let runStart=null,doneDays=0;
   for(let i=ps.length-1;i>=0;i--){
     const p=ps[i];
@@ -150,7 +182,9 @@ export function reqStreaks(h,toKey=K(T())){
     doneDays+=p.done;
   }
   const allDays=runStart?Math.max(0,Math.round((dateOf(toKey)-dateOf(runStart))/864e5)+1):0;
-  return{doneDays,allDays,current,periods:ps,wellDoneCount,totalComplete:completed.length};
+  const lastEntry=hist.filter(([d])=>d<=toKey).pop();
+  const pendingStart=activeReq&&!current&&lastEntry?nextFullStart(lastEntry[0],activeReq):null;
+  return{doneDays,allDays,current,periods:ps,wellDoneCount,totalComplete:completed.length,activeReq,pendingStart:pendingStart&&pendingStart>toKey?pendingStart:null};
 }
 
 // ---- Freeze ----
@@ -269,7 +303,7 @@ export function norm(h){if(!h.goal){h.goal=30;h.unit='min';for(const k in h.done
   if(needsGoalLog(h)&&h.goal>0)h.gl[h.created]=h.goal;
   if(h.fq!==undefined){const f=h.stop?undefined:cleanFreq(h.fq);if(f)h.fq=f;else delete h.fq}
   upgradeNotes(h)}
-export const span=(h,from)=>{const c=dateOf(h.created),f=c>from?c:from;let n=0;for(let d=f;d<=T();d=add(d,1))if(!isOff(h,K(d)))n++;return Math.max(1,n)};
+export const span=(h,from)=>{const c=dateOf(h.created),f=c>from?c:from;let n=0;for(let d=f;d<=T();d=add(d,1))if(!isOff(h,K(d)))n++;return n};
 export const sumAmt=(h,from,to)=>{let n=0;for(let d=from;d<=to;d=add(d,1))n+=h.done[K(d)]||0;return Math.round(n*10)/10};
 
 // ---- "What did you do?" and notes ----
