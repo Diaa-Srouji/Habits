@@ -181,24 +181,11 @@ a.nm{color:inherit}
 .assignrow select{flex:0 1 220px;min-width:0}
 .assignrow .mbtns{flex:none}
 
-/* ---- Swatches & progress colors (defined before overrides, includes .dsw-sm) ---- */
+/* ---- Swatches (base neutral states) ---- */
 .sim{flex:none;width:28px;height:28px;border-radius:8px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}
 .pd{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--cell-ring)}
 .dsw{flex:none;display:block;width:34px;height:34px;border-radius:9px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--line)}
 .dsw-sm{flex:none;display:inline-block;width:16px;height:16px;border-radius:4px;background:var(--pend);box-shadow:inset 0 0 0 1px var(--cell-ring)}
-
-.gc,.heat>.gc,.sim.gc,.dsw.gc,.dsw-sm.gc,.pd.gc,.lv i.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}
-.gc.gz,.heat>.gc.gz,.sim.gc.gz,.dsw.gc.gz,.dsw-sm.gc.gz,.pd.gz,.lv i.gz{background-color:var(--red)}
-.sim.gc:not(.gl),.dsw.gc:not(.gl){box-shadow:inset 0 0 0 1px var(--cell-ring)}
-.dsw.dsk,.dsw-sm.dsk{background-color:var(--skip);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,var(--skip-stripe) 3px,var(--skip-stripe) 5px);box-shadow:inset 0 0 0 1px var(--cell-ring)}
-.dsw-sm.dsk{background-image:repeating-linear-gradient(-45deg,transparent,transparent 2px,var(--skip-stripe) 2px,var(--skip-stripe) 4px)}
-.dsw.dic,.dsw-sm.dic{background:var(--ice);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--icex) 40%,transparent)}
-
-/* ---- >200% Glow & >500% Shimmer ---- */
-.gc.gl,.heat :is(button,.cell).gl{box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 calc(4px + var(--w,0)*8px) color-mix(in srgb,var(--glow) calc(40% + var(--w,0)*45%),transparent);z-index:1}
-.heat-sm :is(button,.cell).gl{box-shadow:0 0 calc(1px + var(--w,0)*3px) color-mix(in srgb,var(--glow) calc(35% + var(--w,0)*55%),transparent)}
-.gs{position:relative;overflow:hidden}
-.gs::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);transform:translateX(-130%);animation:shine 3.2s ease-in-out infinite}
 
 /* ---- Heatmap (fluid 20-week grid ending on current week) ---- */
 .hmode{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
@@ -223,15 +210,31 @@ a.nm{color:inherit}
 .heat-sm>*{width:auto;height:10px;aspect-ratio:auto;border-radius:2.5px;border:0;padding:0;position:relative;background-color:var(--pend);box-shadow:inset 0 0 0 1px var(--cell-ring)}
 .heat-sm .now{box-shadow:0 0 0 1px var(--card),0 0 0 2px var(--ink);outline:none;z-index:2}
 
-/* Cell states */
-.heat .pend{background-color:var(--pend);box-shadow:inset 0 0 0 1px var(--cell-ring)}
-.heat .pre{background:transparent!important;box-shadow:none!important;pointer-events:none}
-.heat .fut{background:transparent;box-shadow:inset 0 0 0 1px var(--fut-ring)}
+/* Cell & swatch color states (declared AFTER base .hframe .heat>* so colors always win) */
+.hframe .heat .pend,.heat .pend{background-color:var(--pend);box-shadow:inset 0 0 0 1px var(--cell-ring)}
+.hframe .heat .pre,.heat .pre{background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--line) 42%,transparent);opacity:.45;pointer-events:none}
+.heat-sm .pre{background:transparent;box-shadow:none;opacity:.3}
+.hframe .heat .fut,.heat .fut{background:transparent;box-shadow:inset 0 0 0 1px var(--fut-ring)}
+
+.gc,.hframe .heat>.gc,.heat>.gc,.sim.gc,.dsw.gc,.dsw-sm.gc,.pd.gc,.lv i.gc,.bt.gc{background-color:color-mix(in srgb,var(--ga),var(--gb) var(--f))}
+.gc.gz,.hframe .heat>.gc.gz,.heat>.gc.gz,.sim.gc.gz,.dsw.gc.gz,.dsw-sm.gc.gz,.pd.gz,.lv i.gz,.bt.gz{background-color:var(--red)}
+.sim.gc:not(.gl),.dsw.gc:not(.gl){box-shadow:inset 0 0 0 1px var(--cell-ring)}
+.dsw.dsk,.dsw-sm.dsk{background-color:var(--skip);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,var(--skip-stripe) 3px,var(--skip-stripe) 5px);box-shadow:inset 0 0 0 1px var(--cell-ring)}
+.dsw-sm.dsk{background-image:repeating-linear-gradient(-45deg,transparent,transparent 2px,var(--skip-stripe) 2px,var(--skip-stripe) 4px)}
+.dsw.dic,.dsw-sm.dic{background:var(--ice);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--icex) 40%,transparent)}
+
+.hframe .heat .skip,.heat .skip{background-color:var(--skip);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,var(--skip-stripe) 3px,var(--skip-stripe) 5px);box-shadow:inset 0 0 0 1px var(--cell-ring)}
+.hframe .heat :is(button,.cell).frz,.heat :is(button,.cell).frz{background-color:var(--ice);container-type:inline-size;overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--icex) 35%,transparent)}
+
+/* >200% Glow & >500% Shimmer */
+.gc.gl,.hframe .heat :is(button,.cell).gl,.heat :is(button,.cell).gl{box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 calc(4px + var(--w,0)*8px) color-mix(in srgb,var(--glow) calc(40% + var(--w,0)*45%),transparent);z-index:1}
+.heat-sm :is(button,.cell).gl{box-shadow:0 0 calc(1px + var(--w,0)*3px) color-mix(in srgb,var(--glow) calc(35% + var(--w,0)*55%),transparent)}
+.gs{position:relative;overflow:hidden}
+.gs::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);transform:translateX(-130%);animation:shine 3.2s ease-in-out infinite}
+
+/* Today & Selected rings (last so they always stay crisp on top of green/red/glow/skip) */
 .hframe .heat .now{outline:none;z-index:2;box-shadow:0 0 0 1.5px var(--card),0 0 0 3px var(--ink)}
 .hframe .heat .sel{outline:none;z-index:3;box-shadow:0 0 0 1.5px var(--card),0 0 0 3px var(--on)}
-
-.heat .skip{background-color:var(--skip);background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,var(--skip-stripe) 3px,var(--skip-stripe) 5px);box-shadow:inset 0 0 0 1px var(--cell-ring)}
-.heat :is(button,.cell).frz{background-color:var(--ice);container-type:inline-size;overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--icex) 35%,transparent)}
 .heat :is(button,.cell).frz::before{content:"❄";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--icex);pointer-events:none;font-size:clamp(8px,55cqw,16px)}
 .heat-sm :is(button,.cell).frz::before{font-size:8px}
 
